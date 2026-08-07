@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+dist-prod/
+dist-staging/
+test-results/
+*.log
+.DS_Store
+Thumbs.db
+.claude/
+cloud/
+CLOUD-COMMANDS.md
+manifests/
+resources/yara-rules/

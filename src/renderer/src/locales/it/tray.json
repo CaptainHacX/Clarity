@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Apri Clarity",
+  "quit": "Esci",
+  "scheduledTaskNotificationTitle": "Clarity - Attività pianificata",
+  "scheduledTaskNotificationBody": "Esecuzione di \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - Scansione completata",
+  "scanCompleteNotificationBody": "Trovati {{itemCount}} elementi ({{sizeMB}} MB) che possono essere puliti.",
+  "scheduledScanName": "Scansione pianificata"
+}

@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Öppna Clarity",
+  "quit": "Avsluta",
+  "scheduledTaskNotificationTitle": "Clarity - Schemalagd aktivitet",
+  "scheduledTaskNotificationBody": "Kör \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - Genomsökning slutförd",
+  "scanCompleteNotificationBody": "Hittade {{itemCount}} objekt ({{sizeMB}} MB) som kan rensas.",
+  "scheduledScanName": "Schemalagd genomsökning"
+}

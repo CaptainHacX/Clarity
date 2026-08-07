@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Відкрити Clarity",
+  "quit": "Вийти",
+  "scheduledTaskNotificationTitle": "Clarity - Заплановане завдання",
+  "scheduledTaskNotificationBody": "Виконується \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - Сканування завершено",
+  "scanCompleteNotificationBody": "Знайдено {{itemCount}} елементів ({{sizeMB}} МБ), які можна очистити.",
+  "scheduledScanName": "Заплановане сканування"
+}

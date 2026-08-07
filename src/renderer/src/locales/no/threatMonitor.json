@@ -1,0 +1,24 @@
+{
+  "pageTitle": "Trusselovervåking",
+  "pageDescription": "Sanntidsovervåking av nettverkstilkoblinger mot kjente trussellister.",
+  "loading": "Laster inn...",
+  "inactive": {
+    "title": "Trusselovervåking er inaktiv",
+    "description": "Ingen svarteliste for trusler er lastet inn. Start Clarity på nytt for å laste den medfølgende seed-listen."
+  },
+  "statusBar": {
+    "blacklistVersion": "Svarteliste",
+    "connectionsScanned": "Tilkoblinger skannet {{time}}",
+    "dnsScanned": "DNS skannet {{time}}",
+    "threatsDetected": "{{count}} trussel oppdaget",
+    "threatsDetectedPlural": "{{count}} trusler oppdaget",
+    "noThreatsDetected": "Ingen trusler oppdaget"
+  },
+  "allClear": {
+    "title": "Alt klart",
+    "description": "Ingen mistenkelige tilkoblinger eller DNS-oppføringer er oppdaget. Overvåkingen fortsetter å skanne i bakgrunnen."
+  },
+  "flaggedConnections": "Flaggede tilkoblinger",
+  "flaggedDnsEntries": "Flaggede DNS-oppføringer",
+  "connectionPid": "PID {{pid}}"
+}

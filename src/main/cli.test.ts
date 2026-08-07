@@ -1,0 +1,167 @@
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { parseCliArgs, ExitCode, cliLog, cliVerbose } from './cli'
+
+describe('parseCliArgs', () => {
+  it('parses --json flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--json', 'registry', 'scan'])
+    expect(result.ctx.json).toBe(true)
+    expect(result.command).toBe('registry')
+  })
+
+  it('parses --verbose flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--verbose', 'scan'])
+    expect(result.ctx.verbosity).toBe('verbose')
+  })
+
+  it('parses --quiet flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--quiet', 'scan'])
+    expect(result.ctx.verbosity).toBe('quiet')
+  })
+
+  it('parses -q as quiet', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '-q', 'scan'])
+    expect(result.ctx.verbosity).toBe('quiet')
+  })
+
+  it('defaults to normal verbosity', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', 'scan'])
+    expect(result.ctx.verbosity).toBe('normal')
+  })
+
+  it('parses --help flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--help'])
+    expect(result.help).toBe(true)
+  })
+
+  it('parses -h flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '-h'])
+    expect(result.help).toBe(true)
+  })
+
+  it('parses --version flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--version'])
+    expect(result.version).toBe(true)
+  })
+
+  it('parses -v flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '-v'])
+    expect(result.version).toBe(true)
+  })
+
+  it('extracts command correctly', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', 'malware', 'scan', '--json'])
+    expect(result.command).toBe('malware')
+    expect(result.ctx.json).toBe(true)
+  })
+
+  it('filters global flags from commandArgs', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--json', '--verbose', 'debloat', 'remove', '--all'])
+    expect(result.commandArgs).toContain('remove')
+    expect(result.commandArgs).toContain('--all')
+    expect(result.commandArgs).not.toContain('--json')
+    expect(result.commandArgs).not.toContain('--verbose')
+  })
+
+  it('detects legacy flags', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--system', '--browser'])
+    expect(result.hasLegacyFlags).toBe(true)
+    expect(result.command).toBeUndefined()
+  })
+
+  it('detects --all as legacy flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--all'])
+    expect(result.hasLegacyFlags).toBe(true)
+  })
+
+  it('detects --clean flag', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli', '--all', '--clean'])
+    expect(result.hasCleanFlag).toBe(true)
+  })
+
+  it('handles no arguments after --cli', () => {
+    const result = parseCliArgs(['node', 'clarity', '--cli'])
+    expect(result.command).toBeUndefined()
+    expect(result.ctx.json).toBe(false)
+    expect(result.ctx.verbosity).toBe('normal')
+  })
+})
+
+describe('ExitCode', () => {
+  it('has expected values', () => {
+    expect(ExitCode.SUCCESS).toBe(0)
+    expect(ExitCode.GENERAL_ERROR).toBe(1)
+    expect(ExitCode.INVALID_ARGS).toBe(2)
+    expect(ExitCode.PERMISSION_DENIED).toBe(3)
+    expect(ExitCode.PARTIAL_SUCCESS).toBe(4)
+    expect(ExitCode.NOTHING_FOUND).toBe(5)
+    expect(ExitCode.UNKNOWN_COMMAND).toBe(6)
+    expect(ExitCode.SCAN_THREATS).toBe(7)
+  })
+
+  it('all values are unique', () => {
+    const values = Object.values(ExitCode)
+    expect(new Set(values).size).toBe(values.length)
+  })
+
+  it('all values are under 128', () => {
+    for (const code of Object.values(ExitCode)) {
+      expect(code).toBeLessThan(128)
+    }
+  })
+})
+
+describe('JSON stdout purity', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function captureStreams(): { out: string[]; err: string[] } {
+    const out: string[] = []
+    const err: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk: any) => {
+      out.push(String(chunk))
+      return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk: any) => {
+      err.push(String(chunk))
+      return true
+    })
+    return { out, err }
+  }
+
+  it('cliLog writes progress to stderr in JSON mode, keeping stdout parseable', () => {
+    const { out, err } = captureStreams()
+    cliLog({ json: true, verbosity: 'normal' }, 'Loading installed programs...')
+    expect(out).toEqual([])
+    expect(err).toEqual(['Loading installed programs...\n'])
+  })
+
+  it('cliLog writes to stdout in human mode', () => {
+    const { out, err } = captureStreams()
+    cliLog({ json: false, verbosity: 'normal' }, 'Scanning network...')
+    expect(out).toEqual(['Scanning network...\n'])
+    expect(err).toEqual([])
+  })
+
+  it('cliLog stays silent in quiet mode regardless of json', () => {
+    const { out, err } = captureStreams()
+    cliLog({ json: true, verbosity: 'quiet' }, 'noise')
+    cliLog({ json: false, verbosity: 'quiet' }, 'noise')
+    expect(out).toEqual([])
+    expect(err).toEqual([])
+  })
+
+  it('cliVerbose writes to stderr in JSON mode', () => {
+    const { out, err } = captureStreams()
+    cliVerbose({ json: true, verbosity: 'verbose' }, 'took 12ms')
+    expect(out).toEqual([])
+    expect(err).toEqual(['  [verbose] took 12ms\n'])
+  })
+
+  it('cliVerbose writes to stdout in human mode', () => {
+    const { out, err } = captureStreams()
+    cliVerbose({ json: false, verbosity: 'verbose' }, 'took 12ms')
+    expect(out).toEqual(['  [verbose] took 12ms\n'])
+    expect(err).toEqual([])
+  })
+})
