@@ -80,7 +80,7 @@ jobs:
         run: npm ci
 
       - name: Azure login (Windows signing)
-        if: runner.os == 'Windows'
+        if: ${{ runner.os == 'Windows' && secrets.AZURE_CREDENTIALS != '' }}
         uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -102,7 +102,7 @@ jobs:
         timeout-minutes: 30
         run: |
           npx electron-vite build
-          if [ "$RUNNER_OS" = "Windows" ]; then
+          if [ "$RUNNER_OS" = "Windows" ] && [ -n "$AZURE_CLIENT_ID" ]; then
             npx electron-builder ${{ matrix.build-args }} --publish always \
               -c.win.azureSignOptions.endpoint="https://eus.codesigning.azure.net" \
               -c.win.azureSignOptions.codeSigningAccountName="clarity-signing" \
@@ -114,6 +114,7 @@ jobs:
 
   publish-choco:
     needs: build
+    if: ${{ secrets.CHOCOLATEY_API_KEY != '' }}
     runs-on: windows-latest
 
     steps:
@@ -158,6 +159,7 @@ jobs:
 
   virustotal-scan:
     needs: build
+    if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -225,6 +227,7 @@ jobs:
 
   publish-winget:
     needs: build
+    if: ${{ secrets.WINGET_GH_TOKEN != '' }}
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ github.token }}
