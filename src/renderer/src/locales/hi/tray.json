@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Clarity खोलें",
+  "quit": "बंद करें",
+  "scheduledTaskNotificationTitle": "Clarity - निर्धारित कार्य",
+  "scheduledTaskNotificationBody": "\"{{name}}\" चल रहा है...",
+  "scanCompleteNotificationTitle": "Clarity - स्कैन पूर्ण",
+  "scanCompleteNotificationBody": "साफ़ किए जा सकने वाले {{itemCount}} आइटम ({{sizeMB}} MB) मिले।",
+  "scheduledScanName": "निर्धारित स्कैन"
+}

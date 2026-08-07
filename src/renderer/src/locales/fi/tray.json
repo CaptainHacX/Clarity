@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Avaa Clarity",
+  "quit": "Lopeta",
+  "scheduledTaskNotificationTitle": "Clarity - Ajastettu tehtävä",
+  "scheduledTaskNotificationBody": "Suoritetaan \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - Tarkistus valmis",
+  "scanCompleteNotificationBody": "Löytyi {{itemCount}} kohdetta ({{sizeMB}} MB), jotka voidaan puhdistaa.",
+  "scheduledScanName": "Ajastettu tarkistus"
+}

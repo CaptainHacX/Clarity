@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Buka Clarity",
+  "quit": "Keluar",
+  "scheduledTaskNotificationTitle": "Clarity - Tugas Berjadual",
+  "scheduledTaskNotificationBody": "Menjalankan \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - Imbasan Selesai",
+  "scanCompleteNotificationBody": "Menemui {{itemCount}} item ({{sizeMB}} MB) yang boleh dibersihkan.",
+  "scheduledScanName": "Imbasan Berjadual"
+}

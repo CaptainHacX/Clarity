@@ -1,0 +1,129 @@
+appId: com.clarity.app
+productName: Clarity
+copyright: Copyright © 2024-2026 Clarity Contributors
+
+# Production packaging config (used by .github/workflows/release.yml).
+# Artifacts land in dist-prod/ and are named with -prod- so they can be
+# told apart from any staging build. For a staging build, override on the CLI:
+#   npx electron-builder --mac -c.directories.output=dist-staging -c.mac.artifactName=Clarity-${version}-staging-${arch}.${ext}
+directories:
+  buildResources: resources
+  output: dist-prod
+
+files:
+  - out/**/*
+
+extraResources:
+  - from: resources/icon.ico
+    to: icon.ico
+    filter:
+      - "**/*"
+  - from: resources/icon.png
+    to: icon.png
+    filter:
+      - "**/*"
+  - from: resources/icons
+    to: icons
+    filter:
+      - "**/*"
+  - from: resources/seed-blacklist.json
+    to: seed-blacklist.json
+    filter:
+      - "**/*"
+  # IEEE OUI registry (39,895 entries) for AP-vendor lookups in the Wi-Fi tool.
+  - from: resources/oui.json
+    to: oui.json
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+  requestedExecutionLevel: requireAdministrator
+
+nsis:
+  oneClick: true
+  # Must stay in sync with win.requestedExecutionLevel above.
+  # requestedExecutionLevel only patches the manifest of Clarity.exe — it has no
+  # effect on the installer. Left per-user (the default), the installer compiles
+  # with `RequestExecutionLevel user`, so it never elevates and then drops an
+  # admin-manifested exe into the user-writable %LOCALAPPDATA%\Programs. Going
+  # per-machine makes the installer request elevation up front, installs to
+  # Program Files, and marks isAdminRightsRequired in the update metadata.
+  perMachine: true
+  allowToChangeInstallationDirectory: false
+  deleteAppDataOnUninstall: false
+  shortcutName: Clarity
+  artifactName: Clarity-Setup-${version}.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  icon: resources/icon.png
+  category: public.app-categories.utilities
+  hardenedRuntime: true
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  notarize: true
+  artifactName: Clarity-${version}-prod-${arch}.${ext}
+  # macOS gates Wi-Fi BSSIDs and country codes behind Location Services. Both
+  # keys are declared: Electron routes navigator.geolocation through
+  # CoreLocation, which refuses to prompt at all unless the bundle carries a
+  # usage string — and without that prompt the Wi-Fi tool can never show a BSSID.
+  extendInfo:
+    NSLocationWhenInUseUsageDescription: Clarity uses your current location to display the names and security details of WiFi networks you are connected to or near.
+    NSLocationUsageDescription: Clarity uses your current location to display the names and security details of WiFi networks you are connected to or near.
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  icon: resources/icons/
+  category: Utility
+  syncDesktopName: true
+  artifactName: Clarity-${version}-prod-${arch}.${ext}
+
+deb:
+  depends:
+    - libgtk-3-0
+    - libnss3
+    - libxss1
+    - libasound2 | libasound2t64
+    - libgbm1
+    - libfuse2 | libfuse2t64
+  afterInstall: scripts/deb-postinstall.sh
+
+# Electron Fuses — hardened runtime settings baked into the Electron binary.
+# These MUST be enabled in the same build that flips them (electron-builder
+# writes them just before packaging), otherwise the packaged app refuses to run.
+# runAsNode/nodeOptions/nodeCliInspect are disabled so the binary cannot be
+# abused as a Node.js REPL / debugger (a common Electron exploit vector).
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  # Unsigned/macOS builds must re-apply the ad-hoc signature after fuse writes.
+  resetAdHocDarwinSignature: true
+
+compression: maximum
+
+publish:
+  provider: github
+  releaseType: release

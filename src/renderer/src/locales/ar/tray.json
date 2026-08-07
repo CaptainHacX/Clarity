@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "فتح Clarity",
+  "quit": "إنهاء",
+  "scheduledTaskNotificationTitle": "Clarity - مهمة مجدولة",
+  "scheduledTaskNotificationBody": "جارٍ تشغيل \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - اكتمل الفحص",
+  "scanCompleteNotificationBody": "تم العثور على {{itemCount}} عنصرًا ({{sizeMB}} ميجابايت) يمكن تنظيفها.",
+  "scheduledScanName": "فحص مجدول"
+}

@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Åpne Clarity",
+  "quit": "Avslutt",
+  "scheduledTaskNotificationTitle": "Clarity - Planlagt oppgave",
+  "scheduledTaskNotificationBody": "Kjører \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - Skanning fullført",
+  "scanCompleteNotificationBody": "Fant {{itemCount}} elementer ({{sizeMB}} MB) som kan ryddes.",
+  "scheduledScanName": "Planlagt skanning"
+}

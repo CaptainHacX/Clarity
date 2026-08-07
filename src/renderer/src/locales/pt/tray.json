@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Abrir Clarity",
+  "quit": "Sair",
+  "scheduledTaskNotificationTitle": "Clarity - Tarefa Agendada",
+  "scheduledTaskNotificationBody": "A executar \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - Verificação Concluída",
+  "scanCompleteNotificationBody": "Foram encontrados {{itemCount}} itens ({{sizeMB}} MB) que podem ser limpos.",
+  "scheduledScanName": "Verificação Agendada"
+}

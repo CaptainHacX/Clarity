@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "เปิด Clarity",
+  "quit": "ออก",
+  "scheduledTaskNotificationTitle": "Clarity - งานที่กำหนดเวลาไว้",
+  "scheduledTaskNotificationBody": "กำลังเรียกใช้ \"{{name}}\"...",
+  "scanCompleteNotificationTitle": "Clarity - การสแกนเสร็จสมบูรณ์",
+  "scanCompleteNotificationBody": "พบ {{itemCount}} รายการ ({{sizeMB}} MB) ที่สามารถล้างได้",
+  "scheduledScanName": "การสแกนตามกำหนดเวลา"
+}

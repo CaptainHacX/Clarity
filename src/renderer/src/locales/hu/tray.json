@@ -1,0 +1,10 @@
+{
+  "trayTooltip": "Clarity",
+  "openClarity": "Clarity megnyitása",
+  "quit": "Kilépés",
+  "scheduledTaskNotificationTitle": "Clarity - Ütemezett feladat",
+  "scheduledTaskNotificationBody": "\"{{name}}\" futtatása...",
+  "scanCompleteNotificationTitle": "Clarity - Vizsgálat befejezve",
+  "scanCompleteNotificationBody": "{{itemCount}} tisztítható elem található ({{sizeMB}} MB).",
+  "scheduledScanName": "Ütemezett vizsgálat"
+}
