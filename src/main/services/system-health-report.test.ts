@@ -13,7 +13,7 @@ const siMock = vi.hoisted(() => ({
 }))
 
 const appMock = vi.hoisted(() => ({
-  getVersion: vi.fn(() => '1.48.0'),
+  getVersion: vi.fn(() => '1.0.0'),
 }))
 
 const netMock = vi.hoisted(() => ({
@@ -126,7 +126,7 @@ function fsMount(overrides: Partial<Systeminformation.FsSizeData> = {}): Systemi
 beforeEach(() => {
   vi.clearAllMocks()
   siMock.time.mockReturnValue({ uptime: 3600 * 24 })
-  appMock.getVersion.mockReturnValue('1.48.0')
+  appMock.getVersion.mockReturnValue('1.0.0')
   siMock.osInfo.mockResolvedValue(osInfo())
   siMock.system.mockResolvedValue(systemData())
   siMock.cpu.mockResolvedValue(cpu())
@@ -174,7 +174,7 @@ describe('generateSystemHealthReport', () => {
     expect(report.system.cpuThreads).toBe(8)
     expect(report.system.totalMemGb).toBe(16)
     expect(report.system.uptimeHours).toBe(24)
-    expect(report.app.version).toBe('1.48.0')
+    expect(report.app.version).toBe('1.0.0')
     expect(report.markdown).toBeTruthy()
   })
 
@@ -304,7 +304,7 @@ describe('renderMarkdown', () => {
   function baseReport(): SystemHealthReport {
     return {
       generatedAt: 1_700_000_000_000,
-      app: { version: '1.48.0', platform: 'darwin', arch: 'arm64' },
+      app: { version: '1.0.0', platform: 'darwin', arch: 'arm64' },
       system: {
         hostname: 'MacBook-Pro', os: 'macOS 15.0', kernel: '24.0.0', arch: 'arm64', uptimeHours: 24,
         manufacturer: 'Apple', model: 'MacBookPro18,1', cpuModel: 'Apple M2', cpuCores: 8, cpuThreads: 8, totalMemGb: 16,

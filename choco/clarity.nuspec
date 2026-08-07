@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>clarity</id>
-    <version>1.4.8</version>
+    <version>1.0.0</version>
     <title>Clarity</title>
     <authors>Advent Development, Inc.</authors>
     <owners>dbfx</owners>
@@ -15,6 +15,6 @@
     <tags>system-cleaner utility optimization disk-cleanup junk-files open-source</tags>
     <summary>A modern, open-source system cleaner for Windows</summary>
     <description>Clarity is a free, open-source system cleaner that helps you remove junk files, free up disk space, and optimize your computer. Built with a modern interface, it provides safe and easy-to-use cleaning tools with automatic updates.</description>
-    <releaseNotes>https://github.com/CaptainHacX/Clarity/releases/tag/v1.4.8</releaseNotes>
+    <releaseNotes>https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.0</releaseNotes>
   </metadata>
 </package>

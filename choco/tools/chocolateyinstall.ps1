@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$version = '1.4.8'
+$version = '1.0.0'
 
 $packageArgs = @{
   packageName    = 'clarity'
