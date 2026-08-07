@@ -28,7 +28,7 @@
 ---
 
 <p align="center">
-  <img src="resources/clarity-animated.gif" alt="Clarity Demo" width="800" />
+  <img src="resources/animated.gif" alt="Clarity Demo" width="800" />
 </p>
 
 ## Download
