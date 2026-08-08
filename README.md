@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://clarity.app"><img src="logo.png" alt="Clarity" width="128" /></a>
+  <a href="https://github.com/CaptainHacX/Clarity"><img src="logo.png" alt="Clarity" width="128" /></a>
 </p>
 
 <h1 align="center">Clarity</h1>
@@ -20,26 +20,28 @@
 
 <p align="center">
   <a href="https://github.com/CaptainHacX/Clarity/releases"><b>Download</b></a> &nbsp;&middot;&nbsp;
-  <a href="https://clarity.app"><b>Website</b></a> &nbsp;&middot;&nbsp;
-  <a href="https://clarity.app/cleaners"><b>Cleaners</b></a> &nbsp;&middot;&nbsp;
+  <a href="https://github.com/CaptainHacX/Clarity"><b>GitHub</b></a> &nbsp;&middot;&nbsp;
+  <a href="https://github.com/CaptainHacX/Clarity/blob/main/rules/CATALOG.md"><b>Cleaner Catalog</b></a> &nbsp;&middot;&nbsp;
   <a href="CLI.md"><b>CLI Docs</b></a>
 </p>
 
 ---
 
 <p align="center">
-  <img src="resources/animated.gif" alt="Clarity Demo" width="800" />
+  <img src="resources/clarity-animated.gif" alt="Clarity Demo" width="800" />
 </p>
 
 ## Download
 
 Get the latest installer for your platform from [GitHub Releases](https://github.com/CaptainHacX/Clarity/releases):
 
-| Platform | Format |
-|----------|--------|
-| Windows | `.exe` installer |
-| macOS | `.dmg` (Intel & Apple Silicon) |
-| Linux | `.AppImage` or `.deb` |
+| Platform | Format | Installer |
+|----------|--------|----------|
+| Windows | `.exe` installer | [Clarity-Setup-1.0.0.exe](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-Setup-1.0.0.exe) |
+| macOS | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-arm64.dmg) |
+| Linux | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-amd64.deb) |
+
+> All releases are published to [github.com/CaptainHacX/Clarity/releases](https://github.com/CaptainHacX/Clarity/releases). Installers are currently unsigned — on macOS, right-click the app and choose **Open** the first time.
 
 ## Why Clarity?
 
@@ -105,7 +107,7 @@ Clarity by design removes files from your system. You are responsible for review
 
 Contributions are welcome! Feel free to open issues, submit PRs, or suggest features.
 
-**Want to add a cleaner for your favorite app?** Clarity's cleaning rules are simple JSON files — no code required. See the [Cleaner Rules Guide](rules/RULES.md) to get started, or browse the [full cleaner directory](https://clarity.app/cleaners) to see what's already covered.
+**Want to add a cleaner for your favorite app?** Clarity's cleaning rules are simple JSON files — no code required. See the [Cleaner Rules Guide](rules/RULES.md) to get started, or browse the [full cleaner directory](https://github.com/CaptainHacX/Clarity/blob/main/rules/CATALOG.md) to see what's already covered.
 
 If you find Clarity useful, consider giving it a star — it helps others discover the project.
 
