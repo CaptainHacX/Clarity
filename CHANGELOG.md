@@ -1,3 +1,16 @@
+# [1.0.1](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.1) (2026-08-11)
+
+### Features
+
+* **perf:** rebuild the performance monitor with live refresh controls, swap and disk-volume telemetry, GPU/VRAM tracking, per-core gauges, and a sensor capability model
+* **cleaner:** add summary cards, result groups, and smart recommendations UI
+* **cve:** surface risk-accepted statuses and expand scanner result handling
+* **i18n:** expand translation coverage across all supported locales
+
+### Chore
+
+* refresh app branding and icons, update release documentation and download links
+
 # [1.0.0](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.0) (2026-08-08)
 
 

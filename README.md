@@ -20,7 +20,7 @@
     Build:     <a href="https://github.com/CaptainHacX/Clarity/actions"><img src="https://img.shields.io/github/actions/workflow/status/CaptainHacX/Clarity/release.yml?style=flat-square&label=Build" alt="Build" /></a>
   -->
   <img src="https://img.shields.io/badge/Stars-Open%20Source-blue?style=flat-square" alt="Stars" />
-  <img src="https://img.shields.io/badge/Release-v1.0.0-blue?style=flat-square" alt="Release" />
+  <img src="https://img.shields.io/badge/Release-v1.0.1-blue?style=flat-square" alt="Release" />
   <img src="https://img.shields.io/badge/Downloads-Free-blue?style=flat-square" alt="Downloads" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Build-Passing-blue?style=flat-square" alt="Build" />
@@ -63,11 +63,11 @@
 
 Grab the latest installer for your platform from [GitHub Releases](https://github.com/CaptainHacX/Clarity/releases):
 
-| Platform | Format | Direct download (v1.0.0) |
+| Platform | Format | Direct download (v1.0.1) |
 |----------|--------|--------------------------|
-| **Windows** | `.exe` installer | [Clarity-Setup-1.0.0.exe](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-Setup-1.0.0.exe) |
-| **macOS** | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-arm64.dmg) |
-| **Linux** | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.0/Clarity-1.0.0-prod-amd64.deb) |
+| **Windows** | `.exe` installer | [Clarity-Setup-1.0.1.exe](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-Setup-1.0.1.exe) |
+| **macOS** | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-arm64.dmg) |
+| **Linux** | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-amd64.deb) |
 
 > Installers are currently **unsigned**. On macOS, right-click the app and choose **Open** the first time you launch it.
 
