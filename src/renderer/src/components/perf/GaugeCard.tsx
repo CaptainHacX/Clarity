@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils'
 
 interface GaugeCardProps {
   label: string
-  percent: number
+  /** 0-100. null when no live data yet — renders "--" instead of a fake 0. */
+  percent: number | null
   detail: string
   className?: string
 }
@@ -20,9 +21,10 @@ const RADIUS = (SIZE - STROKE * 2) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 export const GaugeCard = memo(function GaugeCard({ label, percent, detail, className }: GaugeCardProps) {
-  const clamped = Math.max(0, Math.min(100, percent))
+  const hasData = percent !== null && Number.isFinite(percent)
+  const clamped = hasData ? Math.max(0, Math.min(100, percent!)) : 0
   const offset = CIRCUMFERENCE - (clamped / 100) * CIRCUMFERENCE
-  const color = getColor(clamped)
+  const color = hasData ? getColor(clamped) : 'var(--text-dim)'
   const gradientId = `gauge-grad-${label.replace(/\s+/g, '-')}`
 
   return (
@@ -33,7 +35,7 @@ export const GaugeCard = memo(function GaugeCard({ label, percent, detail, class
         {/* Glow */}
         <div
           className="absolute rounded-full opacity-20 blur-2xl transition-opacity duration-500"
-          style={{ width: SIZE * 0.5, height: SIZE * 0.5, backgroundColor: color }}
+          style={{ width: SIZE * 0.5, height: SIZE * 0.5, backgroundColor: hasData ? color : 'transparent' }}
         />
 
         <svg width={SIZE} height={SIZE} className="-rotate-90">
@@ -56,7 +58,7 @@ export const GaugeCard = memo(function GaugeCard({ label, percent, detail, class
             cy={SIZE / 2}
             r={RADIUS}
             fill="none"
-            stroke={`url(#${gradientId})`}
+            stroke={hasData ? `url(#${gradientId})` : color}
             strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
@@ -66,14 +68,17 @@ export const GaugeCard = memo(function GaugeCard({ label, percent, detail, class
         </svg>
 
         <div className="absolute flex flex-col items-center">
-          <span className="text-[26px] font-bold tracking-tight text-white">
-            {Math.round(clamped)}
+          <span
+            className="text-[26px] font-bold tracking-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {hasData ? Math.round(clamped) : '--'}
           </span>
           <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>%</span>
         </div>
       </div>
 
-      <span className="mt-3 text-[13px] font-semibold text-white">{label}</span>
+      <span className="mt-3 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
       <span className="mt-0.5 text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
         {detail}
       </span>

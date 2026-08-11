@@ -282,8 +282,10 @@ export function parseRuleLine(line: string): FirewallRule | null {
     signature,
     builtin,
     enabled,
-    issues,
-    risk,
+    // A disabled rule allows nothing, so it can't carry an exposure finding —
+    // it only stays in the list so it can be re-enabled later.
+    issues: enabled ? issues : [],
+    risk: enabled ? risk : 'low',
     selected: false,
   }
 }
@@ -310,11 +312,37 @@ export function parseDarwinAppLine(line: string): { id: string; path: string; al
   const path = m[2].trim()
   if (!path.startsWith('/')) return null
   const mode = (m[3] ?? '').toLowerCase()
-  // Only apps explicitly allowed to receive incoming connections are audited.
-  // Blocked apps (and apps with no effective rule) are skipped — they are not
-  // an exposure.
+  // Blocked apps carry no exposure but must still be listed so they can be
+  // re-allowed (allow:false). Apps with no effective rule aren't manageable.
+  if (mode.includes('block')) return { id: m[1], path, allow: false }
   if (mode && !mode.includes('allow')) return null
   return { id: m[1], path, allow: true }
+}
+
+// `socketfilterfw --listapps` prints each app's path and then its mode on the
+// following (indented) line, e.g.:
+//
+//   6 : /Applications/Google Chrome.app
+//                (Block incoming connections)
+//
+// Fold the mode into the path line so parseDarwinAppLine sees one
+// self-contained entry per app, and drop the "Total number of apps = N"
+// header. This also covers a single-line "( mode )" form defensively.
+export function normalizeDarwinListOutput(raw: string): string[] {
+  const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]
+    if (!/^\d+\s*:/.test(l)) continue
+    let entry = l
+    const next = lines[i + 1]
+    if (next && /^\(/.test(next)) {
+      entry += ` ${next}`
+      i++
+    }
+    out.push(entry)
+  }
+  return out
 }
 
 function isDarwinSystemPath(p: string): boolean {
@@ -342,10 +370,9 @@ async function scanDarwinFirewall(onProgress?: (data: FirewallScanProgress) => v
     listOutput = stdout
   } catch { /* no apps listed */ }
 
-  const apps = listOutput
-    .split('\n')
+  const apps = normalizeDarwinListOutput(listOutput)
     .map((l) => parseDarwinAppLine(l))
-    .filter((a): a is { id: string; path: string; allow: boolean } => a !== null && a.allow)
+    .filter((a): a is { id: string; path: string; allow: boolean } => a !== null)
 
   const rules: FirewallRule[] = []
   apps.forEach((app, i) => {
@@ -353,17 +380,19 @@ async function scanDarwinFirewall(onProgress?: (data: FirewallScanProgress) => v
     const programExists = existsSync(program)
     const isSystemPath = isDarwinSystemPath(program)
     const signature: FirewallSignatureStatus = isSystemPath ? 'signed' : 'unknown'
-    const { issues, risk } = classifyRule({
-      program,
-      programResolved: program,
-      programExists,
-      signature,
-      profiles: ['Public'],
-      localPort: 'Any',
-      remoteAddress: 'Any',
-      builtin: isSystemPath,
-      knownGood: false,
-    })
+    const posture = app.allow
+      ? classifyRule({
+          program,
+          programResolved: program,
+          programExists,
+          signature,
+          profiles: ['Public'],
+          localPort: 'Any',
+          remoteAddress: 'Any',
+          builtin: isSystemPath,
+          knownGood: false,
+        })
+      : { issues: [] as FirewallIssue[], risk: 'low' as FirewallRiskLevel }
     rules.push({
       name: program,
       displayName: basename(program),
@@ -378,9 +407,9 @@ async function scanDarwinFirewall(onProgress?: (data: FirewallScanProgress) => v
       programExists,
       signature,
       builtin: isSystemPath,
-      enabled: true,
-      issues,
-      risk,
+      enabled: app.allow,
+      issues: posture.issues,
+      risk: posture.risk,
       selected: false,
     })
     if (i % 25 === 0) {
@@ -493,12 +522,14 @@ export async function scanFirewallRules(
 
   onProgress?.({ phase: 'enumerating', current: 0, total: 0, currentRule: 'Enumerating firewall rules...' })
 
-  // Pull all enabled inbound Allow rules and stream a single line per rule.
+  // Pull all inbound Allow rules, enabled or not. Disabled rules allow nothing
+  // today but are kept in the list so they can be re-enabled after a disable —
+  // removing them from the scan would strand a disabled rule with no way back.
   // Skip Authenticode checks for system-owned paths (Windows / Program Files)
   // since they're invariably signed and the cmdlet is the slow part.
   const script = String.raw`
     $ErrorActionPreference = 'SilentlyContinue'
-    $rules = @(Get-NetFirewallRule | Where-Object { $_.Enabled -eq 'True' -and $_.Direction -eq 'Inbound' -and $_.Action -eq 'Allow' })
+    $rules = @(Get-NetFirewallRule | Where-Object { $_.Direction -eq 'Inbound' -and $_.Action -eq 'Allow' })
     $total = $rules.Count
     Write-Output "TOTAL|$total"
     $i = 0
@@ -544,6 +575,8 @@ export async function scanFirewallRules(
       } catch { continue }
 
       $programRaw = if ($app -and $app.Program) { [string]$app.Program } else { '' }
+      $isEnabled = $true
+      try { $isEnabled = ([string]$r.Enabled) -eq 'True' } catch {}
       # Package SID for AppX/UWP rules (e.g. "S-1-15-2-..."). When set, the
       # rule applies to a sandboxed packaged app — Game Bar, Microsoft Store,
       # and similar Win32WebViewHost / OOBE rules all have this populated even
@@ -570,18 +603,22 @@ export async function scanFirewallRules(
           if ($sysRoot -and $programResolved.StartsWith($sysRoot, 'OrdinalIgnoreCase')) { $isSystemPath = $true }
           if (-not $isSystemPath -and $pf -and $programResolved.StartsWith($pf, 'OrdinalIgnoreCase')) { $isSystemPath = $true }
           if (-not $isSystemPath -and $pfx86 -and $programResolved.StartsWith($pfx86, 'OrdinalIgnoreCase')) { $isSystemPath = $true }
-          if ($isSystemPath) {
-            $signed = 'signed'
-          } elseif ($sigCache.ContainsKey($programResolved)) {
-            $signed = $sigCache[$programResolved]
+          if ($isEnabled) {
+            if ($isSystemPath) {
+              $signed = 'signed'
+            } elseif ($sigCache.ContainsKey($programResolved)) {
+              $signed = $sigCache[$programResolved]
+            } else {
+              try {
+                $sig = Get-AuthenticodeSignature -LiteralPath $programResolved
+                if ($sig.Status -eq 'Valid') { $signed = 'signed' }
+                elseif ($sig.Status -eq 'NotSigned') { $signed = 'unsigned' }
+                else { $signed = 'unknown' }
+              } catch { $signed = 'unknown' }
+              $sigCache[$programResolved] = $signed
+            }
           } else {
-            try {
-              $sig = Get-AuthenticodeSignature -LiteralPath $programResolved
-              if ($sig.Status -eq 'Valid') { $signed = 'signed' }
-              elseif ($sig.Status -eq 'NotSigned') { $signed = 'unsigned' }
-              else { $signed = 'unknown' }
-            } catch { $signed = 'unknown' }
-            $sigCache[$programResolved] = $signed
+            $signed = 'not-applicable'
           }
         }
       }
@@ -593,7 +630,7 @@ export async function scanFirewallRules(
       $grp  = if ($r.Group) { ([string]$r.Group) -replace '\|', ' ' } else { '' }
       $prof = [string]$r.Profile
 
-      Write-Output "RULE|$name|$disp|$desc|$grp|$prof|$protocol|$localPort|$remoteAddr|$programRaw|$programResolved|$exists|$signed|$isSystemPath|$isManaged|true"
+      Write-Output "RULE|$name|$disp|$desc|$grp|$prof|$protocol|$localPort|$remoteAddr|$programRaw|$programResolved|$exists|$signed|$isSystemPath|$isManaged|$isEnabled"
 
       if (($i % 25) -eq 0) {
         Write-Output "PROG|$i|$total|$disp"
@@ -672,7 +709,7 @@ export async function applyFirewallChanges(
     if (typeof c.name !== 'string' || !RULE_NAME_RE.test(c.name)) {
       return { succeeded: 0, failed: changes.length, errors: [{ name: c.name ?? '', displayName: c.name ?? '', reason: 'Invalid rule name' }] }
     }
-    if (c.action !== 'disable' && c.action !== 'delete') {
+    if (c.action !== 'disable' && c.action !== 'enable' && c.action !== 'delete') {
       return { succeeded: 0, failed: changes.length, errors: [{ name: c.name, displayName: c.name, reason: 'Invalid action' }] }
     }
   }
@@ -686,7 +723,7 @@ export async function applyFirewallChanges(
   const lines = changes.map((c) => {
     const safeName = c.name.replace(/'/g, "''")
     const cmd = c.action === 'delete' ? 'Remove-NetFirewallRule' : 'Set-NetFirewallRule'
-    const extra = c.action === 'delete' ? '' : ' -Enabled False'
+    const extra = c.action === 'delete' ? '' : c.action === 'enable' ? ' -Enabled True' : ' -Enabled False'
     return `
 try {
   $rule = Get-NetFirewallRule -Name '${safeName}' -ErrorAction Stop
@@ -748,8 +785,13 @@ async function applyDarwinFirewallChanges(
   let succeeded = 0
   const errors: { name: string; displayName: string; reason: string }[] = []
 
+  // Per-app controls are --blockapp/--unblockapp. (The old code used
+  // --setappmode, which does not exist — socketfilterfw prints usage and exits
+  // 255, so every change failed with "1 failed" even after the elevation prompt
+  // succeeded. --blockapp/--unblockapp also run as the current user, so no root
+  // and no password prompt are required at all.)
   for (const c of changes) {
-    if (c.action !== 'disable') {
+    if (c.action !== 'disable' && c.action !== 'enable') {
       errors.push({ name: c.name, displayName: c.name, reason: 'Rule removal is not supported on macOS' })
       continue
     }
@@ -758,16 +800,14 @@ async function applyDarwinFirewallChanges(
       errors.push({ name: c.name, displayName: c.name, reason: 'Invalid rule name' })
       continue
     }
-    // socketfilterfw --setappmode requires root; without it the command fails
-    // with "Operation not permitted". Arg-array invocation avoids any shell.
     try {
-      await execFileAsync(SOCKETFILTERFW, ['--setappmode', c.name, 'block'], { timeout: 15_000 })
+      await execFileAsync(SOCKETFILTERFW, [c.action === 'disable' ? '--blockapp' : '--unblockapp', c.name], { timeout: 15_000 })
       succeeded++
     } catch {
       errors.push({
         name: c.name,
         displayName: c.name,
-        reason: 'Failed to block app — requires administrator privileges',
+        reason: c.action === 'disable' ? 'Failed to block the app — it may be protected by the system' : 'Failed to allow the app',
       })
     }
   }
@@ -785,7 +825,11 @@ async function applyLinuxFirewallChanges(
 
   for (const c of changes) {
     if (c.action !== 'disable') {
-      errors.push({ name: c.name, displayName: c.name, reason: 'Rule removal is not supported on Linux' })
+      errors.push({
+        name: c.name,
+        displayName: c.name,
+        reason: c.action === 'delete' ? 'Rule removal is not supported on Linux' : 'Only disabling is supported on Linux',
+      })
       continue
     }
     const m = /^port-(\d+)$/.exec(c.name)
@@ -799,8 +843,14 @@ async function applyLinuxFirewallChanges(
     }
     try {
       // Arg-array invocation, no shell. Removing the bare port drops both the
-      // tcp and udp allow rules it was created from. Requires root.
-      await execFileAsync('/usr/sbin/ufw', ['delete', 'allow', m[1]], { timeout: 15_000 })
+      // tcp and udp allow rules it was created from. Requires root — when the
+      // process isn't elevated, go through pkexec so the user gets a polkit
+      // prompt instead of a silent permission failure.
+      if (typeof process.getuid === 'function' && process.getuid() === 0) {
+        await execFileAsync('/usr/sbin/ufw', ['delete', 'allow', m[1]], { timeout: 15_000 })
+      } else {
+        await execFileAsync('/usr/bin/pkexec', ['/usr/sbin/ufw', 'delete', 'allow', m[1]], { timeout: 60_000 })
+      }
       succeeded++
     } catch {
       errors.push({

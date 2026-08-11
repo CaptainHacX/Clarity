@@ -1,12 +1,12 @@
 {
   "pageTitle": "Vulnerabilities",
-  "pageDescription": "View known vulnerabilities detected in your installed software",
+  "pageDescription": "Endpoint-wide view of known vulnerabilities detected across your installed software",
   "loading": "Loading vulnerabilities...",
   "refetchButton": "Refresh",
-  "emptyState": {
-    "title": "No Vulnerabilities Detected",
-    "description": "No known CVEs were found in your installed software. Your system looks secure!"
-  },
+  "scanButton": "Run Vulnerability Scan",
+  "rescanButton": "Rescan",
+  "scanningButton": "Scanning...",
+  "exportButton": "Export Report",
   "severity": {
     "critical": "Critical",
     "high": "High",
@@ -14,38 +14,166 @@
     "low": "Low",
     "none": "None"
   },
+  "status": {
+    "open": "Open",
+    "in-progress": "In Progress",
+    "risk-accepted": "Risk Accepted",
+    "resolved": "Resolved",
+    "ignored": "Ignored"
+  },
+  "risk": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "none": "None"
+  },
+  "score": {
+    "label": "Security Score",
+    "protected": "Protected",
+    "good": "Good",
+    "needsAttention": "Needs Attention",
+    "atRisk": "At Risk",
+    "hint": "Composite score of your current exposure based on the severity and volume of detected vulnerabilities."
+  },
   "summary": {
     "total": "Total",
     "critical": "Critical",
     "high": "High",
     "medium": "Medium",
-    "low": "Low"
+    "low": "Low",
+    "patched": "Patched",
+    "patchedHint": "fix available",
+    "ofFindings": "{{pct}}% of findings"
   },
-  "filter": {
-    "all": "All",
+  "chart": {
+    "severityHeading": "Severity Distribution",
+    "severityHint": "Breakdown of all detected vulnerabilities by severity",
+    "trendHeading": "Vulnerability Trend",
+    "trendHint": "Detection activity over time — new, resolved and remaining",
+    "days7": "7D",
+    "days30": "30D",
+    "days90": "90D",
+    "new": "New",
+    "resolved": "Resolved",
+    "remaining": "Remaining",
+    "noData": "No vulnerability history yet"
+  },
+  "table": {
+    "heading": "Top Vulnerabilities",
+    "hint": "Most important findings first — click a row for full details",
+    "colSeverity": "Severity",
+    "colVulnerability": "Vulnerability",
+    "colCveId": "CVE ID",
+    "colComponent": "Affected Component",
+    "colVersion": "Version",
+    "colRisk": "Risk",
+    "colStatus": "Status",
+    "colAction": "Action",
+    "details": "Details",
+    "resolve": "Resolve",
     "searchPlaceholder": "Search by app name or CVE ID...",
-    "noResults": "No vulnerabilities match your current filters"
-  },
-  "error": {
-    "title": "Failed to Load Vulnerabilities",
-    "description": "Could not retrieve vulnerability data from the server. Try refreshing."
-  },
-  "card": {
-    "installed": "Installed: {{version}}",
-    "fixAvailable": "Fix: {{version}}",
-    "noFix": "No fix available",
-    "cvss": "CVSS {{score}}",
-    "firstDetected": "First detected: {{date}}",
-    "lastScanned": "Last scanned: {{date}}",
-    "viewDetails": "View CVE Details",
-    "checkForUpdates": "Check for Updates"
+    "filterAllSeverities": "All severities",
+    "filterAllStatuses": "All statuses",
+    "filterAllComponents": "All components",
+    "filterAllDates": "All time",
+    "date7": "Last 7 days",
+    "date30": "Last 30 days",
+    "date90": "Last 90 days",
+    "noResults": "No vulnerabilities match your current filters",
+    "noResultsDesc": "Try adjusting the severity, status or search filters.",
+    "showing": "Showing",
+    "of": "of",
+    "na": "N/A"
   },
   "pagination": {
     "previous": "Previous",
     "next": "Next",
     "page": "Page {{current}}"
   },
+  "recs": {
+    "fixCritical": "Fix {{count}} critical vulnerabilit{{plural}}",
+    "fixCriticalDesc": "Critical severity findings should be remediated as soon as possible.",
+    "reviewHigh": "Review {{count}} high-severity vulnerabilit{{plural}}",
+    "reviewHighDesc": "High severity findings pose a significant risk to your system.",
+    "reviewFixes": "{{count}} fix{{plural}} available",
+    "reviewFixesDesc": "Updates are available for detected vulnerabilities — apply them to close the gap.",
+    "allClear": "No critical or high severity findings",
+    "allClearDesc": "Your installed software is in a good state. Keep running regular scans.",
+    "fixNowButton": "Fix Now",
+    "reviewButton": "Review",
+    "goToUpdatesButton": "Go to Updates"
+  },
+  "quick": {
+    "runScan": "Run Scan",
+    "runScanDesc": "Check installed software against the CVE database",
+    "fixCritical": "Fix Critical",
+    "fixCriticalDesc": "Jump to the most severe findings",
+    "viewAll": "View All",
+    "viewAllDesc": "Clear filters and browse every finding",
+    "refresh": "Refresh",
+    "refreshDesc": "Reload the latest scan results",
+    "export": "Export Report",
+    "exportDesc": "Download the findings as a CSV report"
+  },
+  "scan": {
+    "heading": "Scan Status",
+    "lastScan": "Last scan",
+    "never": "Never",
+    "duration": "Duration",
+    "entriesScanned": "Entries scanned",
+    "findings": "Findings",
+    "inProgress": "Scanning your installed software for known vulnerabilities...",
+    "statusProtected": "Protected",
+    "statusAtRisk": "At Risk",
+    "statusScanning": "Scanning",
+    "statusNeedsAttention": "Needs Attention"
+  },
+  "coverage": {
+    "heading": "Coverage",
+    "hint": "CVE entries tracked for your installed components",
+    "entries": "{{total}} of {{library}} entries",
+    "pct": "{{pct}}%"
+  },
+  "slideover": {
+    "close": "Close details",
+    "title": "Vulnerability Details",
+    "overview": "Overview",
+    "riskAssessment": "Risk Assessment",
+    "recommendation": "Recommendation",
+    "description": "Description",
+    "statusHeading": "Remediation Status",
+    "statusHint": "Track how this finding is being handled",
+    "installed": "Installed version",
+    "fixedIn": "Fixed in",
+    "fixedInNone": "No fix available",
+    "firstDetected": "First detected",
+    "lastScanned": "Last scanned",
+    "cvss": "CVSS",
+    "cvssNone": "Not scored",
+    "component": "Component",
+    "referencesHeading": "References",
+    "nvdLink": "Open on NVD",
+    "checkUpdates": "Check for updates",
+    "fixButton": "Fix Now",
+    "fixUnavailable": "No fix published yet",
+    "rescan": "Rescan",
+    "noDescription": "No description available for this CVE.",
+    "risky": "Update {{component}} to {{version}} to remediate this finding.",
+    "riskUnpatched": "No fix is published for this CVE yet. Track the CVE on NVD and rescan after an update.",
+    "riskNone": "Low residual risk — review and mark as resolved if the software is no longer used."
+  },
   "toast": {
-    "fetchFailed": "Failed to load vulnerability data"
+    "fetchFailed": "Failed to load vulnerability data",
+    "statusUpdated": "Status updated",
+    "exportDone": "Report exported",
+    "exportFailed": "Failed to export report"
+  },
+  "empty": {
+    "title": "No Vulnerabilities Found",
+    "description": "No known CVEs were detected in your installed software. Your system looks secure!",
+    "scoreHint": "Perfect score — no known vulnerabilities"
+  },
+  "skeleton": {
+    "loading": "Loading your security overview..."
   }
 }

@@ -23,7 +23,8 @@
     "noTasksSelected": "Nincs kiválasztott feladat",
     "nextRun": "Következő: {{time}}",
     "lastRun": "Utolsó: {{time}}",
-    "neverRun": "Még nem futott"
+    "neverRun": "Még nem futott",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Válasszon sablont",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Havi alapos karbantartás",
     "monthlyDeepMaintenanceDescription": "Teljes tisztítás + beállításjegyzék, illesztőprogramok és szoftverek minden hónap 1-jén 10:00-kor",
     "customLabel": "Egyéni",
-    "customDescription": "Kezdés üres ütemezéssel"
+    "customDescription": "Kezdés üres ütemezéssel",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Ütemezés szerkesztése",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "A műveletek automatikusan, az ütemezés szerint futnak. Győződjön meg arról, hogy a kizárási lista naprakész.",
     "cancelButton": "Mégse",
     "saveChangesButton": "Módosítások mentése",
-    "createScheduleButton": "Ütemezés létrehozása"
+    "createScheduleButton": "Ütemezés létrehozása",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Rendszer",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} órája",
     "daysAgo": "{{count}} napja"
   },
-  "copyNameSuffix": "(másolat)"
+  "copyNameSuffix": "(másolat)",
+  "runNowStarted": "Started \"{{name}}\""
 }

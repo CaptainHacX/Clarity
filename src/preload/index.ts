@@ -40,6 +40,7 @@ import type {
   PerfProcessList,
   PerfKillResult,
   DiskSmartInfo,
+  DiskVolumeUsage,
   HardwareHealthSnapshot,
   UpdateStatus,
   ServiceScanResult,
@@ -277,6 +278,8 @@ const api = {
   },
   scheduleRunComplete: (scheduleId: string, status: string) =>
     ipcRenderer.send(IPC.SCHEDULE_RUN_COMPLETE, scheduleId, status),
+  scheduleRunNow: (scheduleId: string) =>
+    ipcRenderer.send(IPC.SCHEDULE_RUN_NOW, scheduleId),
 
   // Scan history
   historyGet: (): Promise<ScanHistoryEntry[]> => ipcRenderer.invoke(IPC.HISTORY_GET),
@@ -355,14 +358,22 @@ const api = {
   // Performance Monitor
   perfQuickStats: (): Promise<import('../shared/types').PerfQuickStats> => ipcRenderer.invoke(IPC.PERF_QUICK_STATS),
   perfGetSystemInfo: (): Promise<PerfSystemInfo> => ipcRenderer.invoke(IPC.PERF_GET_SYSTEM_INFO),
-  perfStartMonitoring: (): Promise<void> => ipcRenderer.invoke(IPC.PERF_START_MONITORING),
+  perfStartMonitoring: (intervalMs?: number): Promise<void> => ipcRenderer.invoke(IPC.PERF_START_MONITORING, intervalMs),
   perfStopMonitoring: (): Promise<void> => ipcRenderer.invoke(IPC.PERF_STOP_MONITORING),
+  perfSetRefreshInterval: (intervalMs: number): Promise<void> =>
+    ipcRenderer.invoke(IPC.PERF_SET_REFRESH_INTERVAL, intervalMs),
+  perfRefreshNow: (): Promise<void> => ipcRenderer.invoke(IPC.PERF_REFRESH_NOW),
   perfKillProcess: (pid: number): Promise<PerfKillResult> =>
     ipcRenderer.invoke(IPC.PERF_KILL_PROCESS, pid),
   perfGetDiskHealth: (): Promise<DiskSmartInfo[]> =>
     ipcRenderer.invoke(IPC.PERF_DISK_HEALTH),
   perfGetHardwareHealth: (): Promise<HardwareHealthSnapshot> =>
     ipcRenderer.invoke(IPC.PERF_HARDWARE_HEALTH),
+  onPerfDiskVolumes: (callback: (data: DiskVolumeUsage[]) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: DiskVolumeUsage[]) => callback(data)
+    ipcRenderer.on(IPC.PERF_DISK_VOLUMES, handler)
+    return () => { ipcRenderer.removeListener(IPC.PERF_DISK_VOLUMES, handler) }
+  },
   onPerfHardwareHealth: (callback: (data: HardwareHealthSnapshot) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: HardwareHealthSnapshot) => callback(data)
     ipcRenderer.on(IPC.PERF_HARDWARE_HEALTH, handler)
@@ -587,7 +598,7 @@ const api = {
   },
 
   // CVE Scanner
-  cveFetch: (opts?: { page?: number; severity?: string; search?: string }): Promise<CvePageResult> =>
+  cveFetch: (opts?: { page?: number; severity?: string; search?: string; force?: boolean; component?: string }): Promise<CvePageResult> =>
     ipcRenderer.invoke(IPC.CVE_FETCH, opts),
 
   // Progress events

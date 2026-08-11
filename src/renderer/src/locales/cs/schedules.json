@@ -23,7 +23,8 @@
     "noTasksSelected": "Nejsou vybrány žádné úlohy",
     "nextRun": "Další: {{time}}",
     "lastRun": "Poslední: {{time}}",
-    "neverRun": "Nikdy nespustit"
+    "neverRun": "Nikdy nespustit",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Vyberte šablonu",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Měsíční hloubková údržba",
     "monthlyDeepMaintenanceDescription": "Úplné čištění + registr, ovladače a software 1. dne v měsíci v 10:00",
     "customLabel": "Vlastní",
-    "customDescription": "Začněte od nuly s prázdným plánem"
+    "customDescription": "Začněte od nuly s prázdným plánem",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Upravit plán",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Akce se budou automaticky spouštět podle plánu. Ujistěte se, že je váš seznam výjimek aktuální.",
     "cancelButton": "Zrušit",
     "saveChangesButton": "Uložit změny",
-    "createScheduleButton": "Vytvořit plán"
+    "createScheduleButton": "Vytvořit plán",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Systém",
@@ -96,5 +104,6 @@
     "hoursAgo": "před {{count}} h",
     "daysAgo": "před {{count}} d"
   },
-  "copyNameSuffix": "(kopie)"
+  "copyNameSuffix": "(kopie)",
+  "runNowStarted": "Started \"{{name}}\""
 }

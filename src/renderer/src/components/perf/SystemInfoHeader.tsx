@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Cpu, MemoryStick, Monitor, Clock } from 'lucide-react'
+import { Cpu, MemoryStick, Monitor, Clock, Server } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 import type { PerfSystemInfo } from '@shared/types'
 
@@ -22,27 +22,42 @@ export function SystemInfoHeader({ info, uptime }: SystemInfoHeaderProps) {
   if (!info) return null
 
   const items = [
-    { icon: Cpu, label: t('systemInfoCpu'), value: `${info.cpuModel}`, sub: `${info.cpuCores}C / ${info.cpuThreads}T` },
+    {
+      icon: Cpu,
+      label: t('systemInfoCpu'),
+      value: info.cpuModel,
+      sub: t('systemInfoCores', { cores: info.cpuCores, threads: info.cpuThreads })
+    },
     { icon: MemoryStick, label: t('systemInfoMemory'), value: formatBytes(info.totalMemBytes, 1), sub: '' },
-    { icon: Monitor, label: t('systemInfoOs'), value: info.osVersion, sub: '' },
+    {
+      icon: Monitor,
+      label: t('systemInfoOs'),
+      value: info.osVersion,
+      sub: [info.kernel, info.arch].filter(Boolean).join(' · ')
+    },
+    { icon: Server, label: t('systemInfoHostname'), value: info.hostname || '--', sub: '' },
     { icon: Clock, label: t('systemInfoUptime'), value: formatUptime(uptime), sub: '' }
   ]
 
   return (
-    <div
-      className="mb-6 flex flex-wrap gap-4 rounded-2xl p-4"
-      style={{ background: 'var(--card-bg)', border: '1px solid var(--border-default)' }}
-    >
+    <div className="glass-card mb-6 grid grid-cols-1 gap-3 rounded-2xl p-4 sm:grid-cols-2 lg:grid-cols-5">
       {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-3 px-2">
-          <item.icon className="h-4 w-4 shrink-0" style={{ color: 'var(--text-muted)' }} strokeWidth={1.8} />
-          <div className="flex items-baseline gap-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        <div key={item.label} className="flex min-w-0 items-center gap-3 px-2">
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+            style={{ background: 'var(--bg-subtle-2)' }}
+          >
+            <item.icon className="h-4 w-4" style={{ color: 'var(--text-muted)' }} strokeWidth={1.8} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               {item.label}
-            </span>
-            <span className="text-[12px] font-medium text-zinc-300">{item.value}</span>
+            </div>
+            <div className="truncate text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
+              {item.value}
+            </div>
             {item.sub && (
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{item.sub}</span>
+              <div className="truncate text-[10px]" style={{ color: 'var(--text-muted)' }}>{item.sub}</div>
             )}
           </div>
         </div>

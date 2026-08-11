@@ -59,5 +59,8 @@
     "validate:rules": "tsx src/main/rules/validate.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "package": "electron-builder --config electron-builder.yml"
+  },
+  "overrides": {
+    "fs-extra": "^11.3.0"
   }
 }

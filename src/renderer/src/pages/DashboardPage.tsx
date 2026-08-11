@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { motion } from 'framer-motion'
 import {
   HardDrive,
   Sparkles,
@@ -18,14 +19,20 @@ import {
   Server,
   Gamepad2,
   BarChart3,
-  MemoryStick
+  MemoryStick,
+  ArrowRight,
+  Activity,
+  Gauge,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { StatCard } from '@/components/shared/StatCard'
 import { HealthScore } from '@/components/shared/HealthScore'
+import { GaugeCard } from '@/components/perf/GaugeCard'
+import { ProactiveAlertsCard } from '@/components/dashboard/ProactiveAlertsCard'
 import { cn, formatBytes, formatDate, formatNumber } from '@/lib/utils'
 import { useStatsStore } from '@/stores/stats-store'
 import { useSettingsStore } from '@/stores/settings-store'
@@ -36,10 +43,12 @@ import { useServiceStore } from '@/stores/service-store'
 import { useStartupStore } from '@/stores/startup-store'
 import { useGameModeStore } from '@/stores/game-mode-store'
 import { useAlertStore } from '@/stores/alert-store'
-import { ProactiveAlertsCard } from '@/components/dashboard/ProactiveAlertsCard'
-import type { DriveInfo, ScanResult, CleanResult, PerfQuickStats } from '@shared/types'
+import type { DriveInfo, ScanResult, CleanResult, PerfQuickStats, PerfSystemInfo, ActivityEntry } from '@shared/types'
+import type { LucideIcon } from 'lucide-react'
 import { CleanerType } from '@shared/enums'
 import { usePlatform } from '@/hooks/usePlatform'
+
+const EASE = [0.16, 1, 0.3, 1] as const
 
 type OneClickPhase = 'idle' | 'scanning' | 'cleaning' | 'done'
 
@@ -66,12 +75,13 @@ const CLEANER_SCAN_FNS: { type: CleanerType; scan: () => Promise<ScanResult[]>; 
   { type: CleanerType.Database, scan: () => window.clarity.databaseScan(), clean: (ids) => window.clarity.databaseClean(ids) },
 ]
 
-// ── Gauge colors ─────────────────────────────────────────────
-
-function gaugeColor(pct: number): string {
-  if (pct >= 85) return '#ef4444'
-  if (pct >= 60) return '#f59e0b'
-  return '#22c55e'
+const ACTIVITY_ICONS: Record<ActivityEntry['type'], LucideIcon> = {
+  clean: Sparkles,
+  registry: Database,
+  startup: Zap,
+  scan: Search,
+  drivers: Cpu,
+  network: Wifi,
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -101,15 +111,24 @@ export function DashboardPage() {
 
   // ── Lightweight system metrics (no heavy process polling) ──
   const [perf, setPerf] = useState<PerfQuickStats | null>(null)
+  // Rolling samples (cpu/mem %) for the lightweight performance charts.
+  // Polled every 3s via os.cpus()/os.freemem() — near-zero cost.
+  const [trend, setTrend] = useState<Array<{ cpu: number; mem: number }>>([])
+  // One-shot system info (CPU model, OS, memory) — cached in main.
+  const [systemInfo, setSystemInfo] = useState<PerfSystemInfo | null>(null)
 
   useEffect(() => {
     let cancelled = false
     // Initial sample seeds the CPU diff; first result will read 0%
     window.clarity?.perfQuickStats?.().catch(() => {})
+    window.clarity?.perfGetSystemInfo?.().then((info) => { if (!cancelled) setSystemInfo(info) }).catch(() => {})
     const poll = async () => {
       try {
         const data = await window.clarity?.perfQuickStats?.()
-        if (!cancelled && data) setPerf(data)
+        if (!cancelled && data) {
+          setPerf(data)
+          setTrend((prev) => [...prev.slice(-59), { cpu: data.cpuPercent, mem: data.memPercent }])
+        }
       } catch { /* best effort */ }
     }
     // Poll every 3s — uses only os.cpus()/os.freemem(), near-zero cost
@@ -208,6 +227,22 @@ export function DashboardPage() {
 
     if (stats.lastScanDate) score += 40
     return Math.max(0, Math.min(100, score))
+  })()
+
+  const healthStatus = (() => {
+    if (healthScore >= 71) return { label: t('healthStatusExcellent'), color: '#22c55e' }
+    if (healthScore >= 41) return { label: t('healthStatusGood'), color: '#f59e0b' }
+    return { label: t('healthStatusAttention'), color: '#ef4444' }
+  })()
+
+  const healthInsight = (() => {
+    if (healthScore < 41) return t('healthInsightPoor')
+    if (drives.length > 0 && Math.max(...drives.map((d) => d.usedSpace / d.totalSize)) > 0.8) return t('healthInsightDiskFull')
+    const daysSince = stats.lastScanDate
+      ? (Date.now() - new Date(stats.lastScanDate).getTime()) / (1000 * 60 * 60 * 24)
+      : Infinity
+    if (daysSince > 7) return t('healthInsightStale')
+    return t('healthInsightHealthy')
   })()
 
   // ── One-click clean callbacks (unchanged logic) ────────────
@@ -432,6 +467,7 @@ export function DashboardPage() {
   const diskPct = drives.length > 0
     ? Math.round((drives.reduce((s, d) => s + d.usedSpace, 0) / drives.reduce((s, d) => s + d.totalSize, 0)) * 100)
     : 0
+  const totalFree = drives.reduce((s, d) => s + d.freeSpace, 0)
 
   function formatGmElapsed(ms: number): string {
     const s = Math.floor(ms / 1000)
@@ -441,290 +477,409 @@ export function DashboardPage() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
   }
 
+  const recentActivity = stats.recentActivity.slice(0, 6)
+
   // ── Render ─────────────────────────────────────────────────
 
   return (
-    <div className="animate-fade-in flex h-full flex-col overflow-y-auto">
-      <PageHeader title={t('pageTitle')} description={t('pageDescription')} />
-
-      <div className="flex-1 space-y-5 px-0 pb-8">
-        {/* ── System Gauges Row ────────────────────────── */}
-        <div className="grid grid-cols-4 gap-3">
-          <MiniGauge icon={Cpu} label={t('gaugeCpu')} percent={Math.round(cpuPct)} detail={`${Math.round(cpuPct)}%`} />
-          <MiniGauge icon={MemoryStick} label={t('gaugeRam')} percent={Math.round(ramPct)} detail={perf ? `${formatBytes(perf.memUsedBytes)} / ${formatBytes(perf.memTotalBytes)}` : '—'} />
-          <MiniGauge icon={HardDrive} label={t('gaugeDisk')} percent={diskPct} detail={`${diskPct}% ${t('gaugeDiskUsed')}`} />
-          <MiniGauge icon={BarChart3} label={t('gaugeScans')} percent={Math.min(100, stats.totalScans * 10)} detail={`${stats.totalScans} ${t('gaugeScansRun')}`} />
-        </div>
-
-        {/* ── Hero Row: Health + Game Mode ─────────────── */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Health Score Card */}
+    <div className="flex h-full flex-col overflow-y-auto">
+      <PageHeader
+        title={t('pageTitle')}
+        description={t('pageDescription')}
+        action={
           <div
-            className="glass-card flex flex-col items-center justify-center rounded-2xl px-6 py-6"
+            className="flex items-center gap-2 rounded-full px-3.5 py-1.5"
+            style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}
           >
-            <HealthScore score={healthScore} size="md" />
-            <div className="mt-4 flex items-center gap-2">
-              {toolCoverage.map((tool) => {
-                const Icon = tool.icon
-                const route = toolRoutes[tool.key]
-                return (
-                  <div
-                    key={tool.key}
-                    className="relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors hover:brightness-110"
-                    style={{
-                      background: tool.usedRecently ? tool.color + '18' : 'var(--bg-subtle)',
-                      border: `1px solid ${tool.usedRecently ? tool.color + '30' : 'var(--border-subtle)'}`
-                    }}
-                    title={`${tool.label}: ${tool.usedRecently ? t('toolTipUsedRecently') : tool.usedEver ? t('toolTipNotUsedRecently') : t('toolTipNeverUsed')}`}
-                    onClick={() => route && navigate(route)}
-                  >
-                    <Icon
-                      className="h-3.5 w-3.5"
-                      style={{ color: tool.usedRecently ? tool.color : 'var(--text-faint)' }}
-                      strokeWidth={1.8}
-                    />
-                    {tool.usedRecently && (
-                      <div
-                        className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full"
-                        style={{ background: '#22c55e' }}
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: '#22c55e', boxShadow: '0 0 8px rgba(34,197,94,0.6)' }}
+            />
+            <span className="text-[12px] font-medium text-zinc-300">{t('headerStatusOnline')}</span>
+          </div>
+        }
+      />
+
+      <div className="flex-1 space-y-8 px-0 pb-8">
+        {/* ── 1 · System Health ─────────────────────────── */}
+        <Section index={0}>
+          <SectionHeading icon={Activity} title={t('sectionHealth')} />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {/* Health score */}
+            <div className="glass-card glass-card-hover flex flex-col items-center justify-center rounded-2xl px-6 py-7">
+              <HealthScore score={healthScore} size="lg" />
+              <span
+                className="mt-4 text-[13px] font-bold tracking-wide"
+                style={{ color: healthStatus.color, textShadow: `0 0 18px ${healthStatus.color}30` }}
+              >
+                {healthStatus.label}
+              </span>
+              <p className="mt-2 max-w-[230px] text-center text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                {healthInsight}
+              </p>
+            </div>
+
+            {/* Maintenance coverage */}
+            <div className="glass-card flex flex-col rounded-2xl px-5 py-5">
+              <h3 className="text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('coverageHeading')}</h3>
+              <p className="mb-4 mt-0.5 text-[11px]" style={{ color: 'var(--text-faint)' }}>{t('coverageHint')}</p>
+              <div className="grid flex-1 grid-cols-1 content-start gap-2 sm:grid-cols-2">
+                {toolCoverage.map((tool) => {
+                  const Icon = tool.icon
+                  const route = toolRoutes[tool.key]
+                  return (
+                    <div
+                      key={tool.key}
+                      className="group flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all hover:brightness-125"
+                      style={{
+                        background: tool.usedRecently ? tool.color + '14' : 'var(--bg-subtle)',
+                        border: `1px solid ${tool.usedRecently ? tool.color + '28' : 'var(--border-subtle)'}`
+                      }}
+                      title={`${tool.label}: ${tool.usedRecently ? t('toolTipUsedRecently') : tool.usedEver ? t('toolTipNotUsedRecently') : t('toolTipNeverUsed')}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => route && navigate(route)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && route) navigate(route) }}
+                    >
+                      <span className="relative shrink-0">
+                        <Icon className="h-4 w-4" style={{ color: tool.usedRecently ? tool.color : 'var(--text-faint)' }} strokeWidth={1.8} />
+                        {tool.usedRecently && (
+                          <span
+                            className="absolute -right-1 -top-1 flex h-2.5 w-2.5 items-center justify-center rounded-full"
+                            style={{ background: '#22c55e' }}
+                          >
+                            <Check className="h-1.5 w-1.5 text-white" strokeWidth={3} />
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className="flex-1 truncate text-[12px] font-medium"
+                        style={{ color: tool.usedRecently ? 'var(--text-primary)' : 'var(--text-muted)' }}
                       >
-                        <Check className="h-2 w-2 text-white" strokeWidth={3} />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                        {tool.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div
+                className="mt-4 flex items-center justify-between rounded-xl px-3.5 py-2.5"
+                style={{ background: 'var(--bg-subtle)' }}
+              >
+                <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  {t('statusLastScan')}
+                </span>
+                <span className="text-[12px] font-semibold text-zinc-300">
+                  {stats.lastScanDate ? formatDate(stats.lastScanDate) : t('statusLastScanNever')}
+                </span>
+              </div>
+            </div>
+
+            {/* Proactive alerts */}
+            <ProactiveAlertsCard />
+          </div>
+        </Section>
+
+        {/* ── 2 · System Overview ──────────────────────── */}
+        <Section index={1}>
+          <SectionHeading icon={Gauge} title={t('sectionOverview')} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <GaugeCard
+              label={t('gaugeCpu')}
+              percent={Math.round(cpuPct)}
+              detail={systemInfo ? `${systemInfo.cpuCores} ${t('overviewCoresSuffix')}` : '—'}
+            />
+            <GaugeCard
+              label={t('gaugeRam')}
+              percent={Math.round(ramPct)}
+              detail={perf ? `${formatBytes(perf.memUsedBytes)} / ${formatBytes(perf.memTotalBytes)}` : '—'}
+            />
+            <GaugeCard
+              label={t('gaugeDisk')}
+              percent={diskPct}
+              detail={drives.length > 0 ? `${formatBytes(totalFree)} ${t('gaugeDiskFree')}` : '—'}
+            />
+
+            {/* System info */}
+            <div className="glass-card glass-card-hover flex flex-col rounded-2xl px-5 py-5">
+              <div className="mb-2 flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: 'var(--bg-subtle-2)' }}>
+                  <Cpu className="h-4 w-4" style={{ color: 'var(--text-muted)' }} strokeWidth={1.8} />
+                </div>
+                <h3 className="text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('overviewSystem')}</h3>
+              </div>
+              <div className="flex flex-1 flex-col justify-center divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                <InfoRow label={t('overviewProcessor')} value={systemInfo?.cpuModel || '—'} />
+                <InfoRow
+                  label={t('overviewCores')}
+                  value={systemInfo ? `${systemInfo.cpuCores} / ${systemInfo.cpuThreads}` : '—'}
+                />
+                <InfoRow label={t('overviewMemory')} value={systemInfo ? formatBytes(systemInfo.totalMemBytes) : '—'} />
+                <InfoRow label={t('overviewOs')} value={systemInfo?.osVersion || '—'} />
+              </div>
             </div>
           </div>
+        </Section>
 
-          {/* Game Mode Card */}
-          {features.gameMode ? (
+        {/* ── 3 · Performance ──────────────────────────── */}
+        <Section index={2}>
+          <SectionHeading icon={BarChart3} title={t('sectionPerformance')} />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <TrendCard title={t('chartCpuTitle')} color="#f59e0b" hasData={trend.length >= 2}>
+              <TrendChart data={trend} dataKey="cpu" color="#f59e0b" unit="%" />
+            </TrendCard>
+            <TrendCard title={t('chartMemoryTitle')} color="#3b82f6" hasData={trend.length >= 2}>
+              <TrendChart data={trend} dataKey="mem" color="#3b82f6" unit="%" />
+            </TrendCard>
+          </div>
+        </Section>
+
+        {/* ── 4 · Cleanup Summary ──────────────────────── */}
+        <Section index={3}>
+          <SectionHeading icon={Trash2} title={t('sectionCleanup')} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard icon={HardDrive} label={t('statSpaceRecovered')} value={stats.totalSpaceSaved} displayValue={formatBytes(stats.totalSpaceSaved)} variant="accent" />
+            <StatCard icon={FileStack} label={t('statFilesCleaned')} value={stats.totalFilesCleaned} variant="success" />
+            <StatCard icon={BarChart3} label={t('statTotalScans')} value={stats.totalScans} />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Storage overview */}
+            <div className="glass-card rounded-2xl px-5 py-5">
+              <h3 className="mb-4 text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('storageOverviewHeading')}</h3>
+              <div className="space-y-5">
+                {drives.length === 0 && (
+                  <p className="py-4 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                    {t('storageOverviewEmpty')}
+                  </p>
+                )}
+                {drives.map((drive) => (
+                  <DriveBar key={drive.letter} drive={drive} platform={platform} />
+                ))}
+              </div>
+            </div>
+
+            {/* Recent activity */}
+            <div className="glass-card rounded-2xl px-5 py-5">
+              <h3 className="mb-4 text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('recentActivityHeading')}</h3>
+              {recentActivity.length === 0 ? (
+                <p className="py-4 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                  {t('recentActivityEmpty')}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {recentActivity.map((entry) => {
+                    const Icon = ACTIVITY_ICONS[entry.type] ?? Search
+                    return (
+                      <li
+                        key={entry.id}
+                        className="flex items-center gap-3 rounded-xl px-3.5 py-2.5"
+                        style={{ background: 'var(--bg-subtle)' }}
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--bg-subtle-2)' }}>
+                          <Icon className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} strokeWidth={1.8} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-zinc-300">
+                          {entry.message}
+                        </span>
+                        <span className="shrink-0 text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                          {formatDate(entry.timestamp)}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </Section>
+
+        {/* ── 5 · Quick Actions ────────────────────────── */}
+        <Section index={4}>
+          <SectionHeading icon={Zap} title={t('sectionActions')} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Quick Clean */}
+            <button
+              onClick={() => setShowQuickConfirm(true)}
+              disabled={isRunning}
+              className={cn(
+                'glass-card glass-card-hover glow-amber group relative flex items-center gap-4 rounded-2xl p-5 text-left transition-all disabled:opacity-60',
+              )}
+            >
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  boxShadow: '0 0 20px rgba(245,158,11,0.2)'
+                }}
+              >
+                <Sparkles className="h-5 w-5" style={{ color: 'var(--text-on-accent)' }} strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-semibold text-zinc-200">{t('quickCleanTitle')}</p>
+                <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  {features.registry ? t('quickCleanDescriptionWithRegistry') : t('quickCleanDescriptionWithoutRegistry')}
+                </p>
+              </div>
+              <ArrowRight
+                className="h-4 w-4 shrink-0 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+                style={{ color: 'var(--text-faint)' }}
+                strokeWidth={1.8}
+              />
+            </button>
+
+            {/* Full Clean */}
+            <button
+              onClick={() => setShowFullConfirm(true)}
+              disabled={isRunning}
+              className={cn(
+                'glass-card glass-card-hover glow-blue group relative flex items-center gap-4 rounded-2xl p-5 text-left transition-all disabled:opacity-60',
+              )}
+            >
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  boxShadow: '0 0 20px rgba(59,130,246,0.2)'
+                }}
+              >
+                <Shield className="h-5 w-5 text-white" strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-semibold text-zinc-200">{t('fullCleanTitle')}</p>
+                <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  {features.registry ? t('fullCleanDescriptionWithRegistry') : t('fullCleanDescriptionWithoutRegistry')}
+                </p>
+              </div>
+              <ArrowRight
+                className="h-4 w-4 shrink-0 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+                style={{ color: 'var(--text-faint)' }}
+                strokeWidth={1.8}
+              />
+            </button>
+          </div>
+
+          {/* Game Mode (Windows) */}
+          {features.gameMode && (
             <button
               onClick={() => navigate('/game-mode')}
-              className={cn(
-                'glass-card glass-card-hover group relative flex flex-col items-center justify-center rounded-2xl px-6 py-6 text-center transition-all',
-              )}
+              className="glass-card glass-card-hover group relative mt-4 flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left transition-all"
               style={{
+                animation: gameModeActive ? 'game-mode-pulse 2.5s ease-in-out infinite' : undefined,
+                borderColor: gameModeActive ? 'rgba(6,182,212,0.25)' : undefined,
                 background: gameModeActive
                   ? 'linear-gradient(180deg, rgba(6,182,212,0.08) 0%, rgba(139,92,246,0.04) 100%)'
                   : undefined,
-                borderColor: gameModeActive ? 'rgba(6,182,212,0.2)' : undefined,
-                animation: gameModeActive ? 'game-mode-pulse 2.5s ease-in-out infinite' : undefined,
               }}
             >
               <div
-                className="flex h-14 w-14 items-center justify-center rounded-full transition-all"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
                 style={{
                   background: gameModeActive
                     ? 'linear-gradient(135deg, #06b6d4, #8b5cf6)'
                     : 'var(--bg-hover)',
-                  border: `2px solid ${gameModeActive ? '#06b6d4' : 'var(--border-strong)'}`,
+                  border: `1px solid ${gameModeActive ? '#06b6d4' : 'var(--border-strong)'}`
                 }}
               >
-                <Gamepad2
-                  className="h-6 w-6"
-                  style={{ color: gameModeActive ? '#fff' : 'var(--text-muted)' }}
-                  strokeWidth={2}
-                />
+                <Gamepad2 className="h-5 w-5" style={{ color: gameModeActive ? '#fff' : 'var(--text-muted)' }} strokeWidth={2} />
               </div>
-              <span
-                className="mt-3 text-xs font-bold tracking-[0.2em]"
-                style={{ color: gameModeActive ? '#06b6d4' : 'var(--text-muted)' }}
-              >
-                {gameModeActive ? t('gameModeActive') : t('gameModeReady')}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold tracking-[0.15em]" style={{ color: gameModeActive ? '#06b6d4' : 'var(--text-secondary)' }}>
+                  {gameModeActive ? t('gameModeActive') : t('gameModeReady')}
+                </p>
+                <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                  {gameModeActive ? t('gameModeRunning') : t('gameModeClickToOpen')}
+                </p>
+              </div>
               {gameModeActive && gameModeActivatedAt && (
-                <span className="mt-1 font-mono text-lg font-semibold tabular-nums" style={{ color: '#06b6d4' }}>
+                <span className="shrink-0 font-mono text-lg font-semibold tabular-nums" style={{ color: '#06b6d4' }}>
                   {formatGmElapsed(gmElapsed)}
                 </span>
               )}
-              {!gameModeActive && (
-                <span className="mt-1 text-[11px] text-zinc-600 group-hover:text-zinc-400 transition-colors">
-                  {t('gameModeClickToOpen')}
-                </span>
-              )}
+              <ArrowRight
+                className="h-4 w-4 shrink-0 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+                style={{ color: 'var(--text-faint)' }}
+                strokeWidth={1.8}
+              />
             </button>
-          ) : (
-            /* Non-Windows: Status block instead of Game Mode */
+          )}
+
+          {/* ── Progress / result banner ────────────────── */}
+          {isRunning && (
             <div
-              className="glass-card flex flex-col justify-center rounded-2xl px-5 py-4"
+              className="glass-card mt-4 rounded-2xl px-5 py-4"
+              style={{ borderColor: 'rgba(245,158,11,0.15)' }}
             >
-              <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                {t('statusHeading')}
-              </h3>
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('statusLastScan')}</span>
-                  <span className="text-[12px] font-medium text-zinc-300">
-                    {stats.lastScanDate ? formatDate(stats.lastScanDate) : t('statusLastScanNever')}
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-400" strokeWidth={2} />
+                <span className="flex-1 text-[13px] text-zinc-400">{phaseLabel || t('progressWorking')}</span>
+                {stepProgress.total > 0 && (
+                  <span className="font-mono text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {stepProgress.current}/{stepProgress.total}
                   </span>
+                )}
+              </div>
+              {stepProgress.total > 0 && (
+                <div className="mt-2.5 h-[3px] overflow-hidden rounded-full" style={{ background: 'var(--bg-subtle-2)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${(stepProgress.current / stepProgress.total) * 100}%`, background: 'var(--accent)' }}
+                  />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('statusTotalScans')}</span>
-                  <span className="text-[12px] font-medium text-zinc-300">{formatNumber(stats.totalScans)}</span>
+              )}
+            </div>
+          )}
+
+          {phase === 'done' && result && (
+            <div
+              className="glass-card mt-4 rounded-2xl p-4"
+              style={{ background: 'rgba(34,197,94,0.04)', borderColor: 'rgba(34,197,94,0.12)' }}
+            >
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" strokeWidth={1.8} />
+                <div>
+                  <p className="text-[13px] font-medium text-zinc-200">{t('resultCleanupComplete')}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
+                    {result.spaceRecovered > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultSpaceRecovered', { size: formatBytes(result.spaceRecovered) })}</p>}
+                    {result.filesCleaned > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultFilesCleaned', { count: formatNumber(result.filesCleaned) })}</p>}
+                    {result.registryFixed > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultRegistryFixed', { count: result.registryFixed })}</p>}
+                    {result.driversRemoved > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultDriversRemoved', { count: result.driversRemoved })}</p>}
+                    {result.threatsFound > 0 && (
+                      result.threatsQuarantined > 0 ? (
+                        <button onClick={() => navigate('/malware', { state: { tab: 'quarantine' } })} className="text-[12px] hover:underline" style={{ color: '#22c55e' }}>
+                          {t(result.threatsQuarantined !== 1 ? 'resultThreatsQuarantinedPlural' : 'resultThreatsQuarantined', { count: result.threatsQuarantined })} &rarr;
+                        </button>
+                      ) : (
+                        <p className="text-[12px]" style={{ color: '#ef4444' }}>
+                          {t(result.threatsQuarantined !== 1 ? 'resultThreatsQuarantinedPlural' : 'resultThreatsQuarantined', { count: result.threatsQuarantined })}
+                        </p>
+                      )
+                    )}
+                    {result.threatsFound === 0 && result.privacyScore > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultNoThreatsFound')}</p>}
+                    {result.privacyIssues > 0 && (
+                      <button onClick={() => navigate('/hardening')} className="text-[12px] hover:underline" style={{ color: '#3b82f6' }}>
+                        {t(result.privacyIssues !== 1 ? 'resultPrivacyImprovementsPlural' : 'resultPrivacyImprovements', { count: result.privacyIssues })} &rarr;
+                      </button>
+                    )}
+                    {result.startupHighImpact > 0 && (
+                      <button onClick={() => navigate('/startup')} className="text-[12px] hover:underline" style={{ color: '#3b82f6' }}>
+                        {t(result.startupHighImpact !== 1 ? 'resultStartupHighImpactPlural' : 'resultStartupHighImpact', { count: result.startupHighImpact })} &rarr;
+                      </button>
+                    )}
+                    {result.updatesAvailable > 0 && (
+                      <button onClick={() => navigate('/updates')} className="text-[12px] hover:underline" style={{ color: '#3b82f6' }}>
+                        {t(result.updatesAvailable !== 1 ? 'resultSoftwareUpdatesPlural' : 'resultSoftwareUpdates', { count: result.updatesAvailable })} &rarr;
+                      </button>
+                    )}
+                    {result.spaceRecovered === 0 && result.filesCleaned === 0 && result.registryFixed === 0 && result.driversRemoved === 0 && result.threatsFound === 0 && result.privacyIssues === 0 && result.startupHighImpact === 0 && result.updatesAvailable === 0 && (
+                      <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultSystemAlreadyClean')}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           )}
-        </div>
-
-        {/* ── Stats Row ───────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4">
-          <StatCard icon={HardDrive} label={t('statSpaceRecovered')} value={stats.totalSpaceSaved} displayValue={formatBytes(stats.totalSpaceSaved)} variant="accent" />
-          <StatCard icon={FileStack} label={t('statFilesCleaned')} value={stats.totalFilesCleaned} variant="success" />
-          <StatCard icon={BarChart3} label={t('statTotalScans')} value={stats.totalScans} />
-        </div>
-
-        {/* ── Action Buttons ──────────────────────────── */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Quick Clean */}
-          <button
-            onClick={() => setShowQuickConfirm(true)}
-            disabled={isRunning}
-            className={cn(
-              'glass-card glass-card-hover glow-amber group relative flex items-center gap-4 rounded-2xl p-5 text-left transition-all disabled:opacity-60',
-            )}
-          >
-            <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-              style={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                boxShadow: '0 0 20px rgba(245,158,11,0.2)'
-              }}
-            >
-              <Sparkles className="h-5 w-5" style={{ color: 'var(--text-on-accent)' }} strokeWidth={2.2} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-semibold text-zinc-200">{t('quickCleanTitle')}</p>
-              <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                {features.registry ? t('quickCleanDescriptionWithRegistry') : t('quickCleanDescriptionWithoutRegistry')}
-              </p>
-            </div>
-          </button>
-
-          {/* Full Clean */}
-          <button
-            onClick={() => setShowFullConfirm(true)}
-            disabled={isRunning}
-            className={cn(
-              'glass-card glass-card-hover glow-blue group relative flex items-center gap-4 rounded-2xl p-5 text-left transition-all disabled:opacity-60',
-            )}
-          >
-            <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                boxShadow: '0 0 20px rgba(59,130,246,0.2)'
-              }}
-            >
-              <Shield className="h-5 w-5 text-white" strokeWidth={2.2} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-semibold text-zinc-200">{t('fullCleanTitle')}</p>
-              <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                {features.registry ? t('fullCleanDescriptionWithRegistry') : t('fullCleanDescriptionWithoutRegistry')}
-              </p>
-            </div>
-          </button>
-        </div>
-
-        {/* ── Progress / result banner ─────────────────── */}
-        {isRunning && (
-          <div
-            className="glass-card rounded-2xl px-5 py-4"
-            style={{ borderColor: 'rgba(245,158,11,0.15)' }}
-          >
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-400" strokeWidth={2} />
-              <span className="flex-1 text-[13px] text-zinc-400">{phaseLabel || t('progressWorking')}</span>
-              {stepProgress.total > 0 && (
-                <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                  {stepProgress.current}/{stepProgress.total}
-                </span>
-              )}
-            </div>
-            {stepProgress.total > 0 && (
-              <div className="mt-2.5 h-[3px] overflow-hidden rounded-full" style={{ background: 'var(--bg-subtle-2)' }}>
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${(stepProgress.current / stepProgress.total) * 100}%`, background: 'var(--accent)' }}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {phase === 'done' && result && (
-          <div
-            className="glass-card rounded-2xl p-4"
-            style={{ background: 'rgba(34,197,94,0.04)', borderColor: 'rgba(34,197,94,0.12)' }}
-          >
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" strokeWidth={1.8} />
-              <div>
-                <p className="text-[13px] font-medium text-zinc-200">{t('resultCleanupComplete')}</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
-                  {result.spaceRecovered > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultSpaceRecovered', { size: formatBytes(result.spaceRecovered) })}</p>}
-                  {result.filesCleaned > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultFilesCleaned', { count: formatNumber(result.filesCleaned) })}</p>}
-                  {result.registryFixed > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultRegistryFixed', { count: result.registryFixed })}</p>}
-                  {result.driversRemoved > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultDriversRemoved', { count: result.driversRemoved })}</p>}
-                  {result.threatsFound > 0 && (
-                    result.threatsQuarantined > 0 ? (
-                      <button onClick={() => navigate('/malware', { state: { tab: 'quarantine' } })} className="text-[12px] hover:underline" style={{ color: '#22c55e' }}>
-                        {t(result.threatsQuarantined !== 1 ? 'resultThreatsQuarantinedPlural' : 'resultThreatsQuarantined', { count: result.threatsQuarantined })} &rarr;
-                      </button>
-                    ) : (
-                      <p className="text-[12px]" style={{ color: '#ef4444' }}>
-                        {t(result.threatsQuarantined !== 1 ? 'resultThreatsQuarantinedPlural' : 'resultThreatsQuarantined', { count: result.threatsQuarantined })}
-                      </p>
-                    )
-                  )}
-                  {result.threatsFound === 0 && result.privacyScore > 0 && <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultNoThreatsFound')}</p>}
-                  {result.privacyIssues > 0 && (
-                    <button onClick={() => navigate('/hardening')} className="text-[12px] hover:underline" style={{ color: '#3b82f6' }}>
-                      {t(result.privacyIssues !== 1 ? 'resultPrivacyImprovementsPlural' : 'resultPrivacyImprovements', { count: result.privacyIssues })} &rarr;
-                    </button>
-                  )}
-                  {result.startupHighImpact > 0 && (
-                    <button onClick={() => navigate('/startup')} className="text-[12px] hover:underline" style={{ color: '#3b82f6' }}>
-                      {t(result.startupHighImpact !== 1 ? 'resultStartupHighImpactPlural' : 'resultStartupHighImpact', { count: result.startupHighImpact })} &rarr;
-                    </button>
-                  )}
-                  {result.updatesAvailable > 0 && (
-                    <button onClick={() => navigate('/updates')} className="text-[12px] hover:underline" style={{ color: '#3b82f6' }}>
-                      {t(result.updatesAvailable !== 1 ? 'resultSoftwareUpdatesPlural' : 'resultSoftwareUpdates', { count: result.updatesAvailable })} &rarr;
-                    </button>
-                  )}
-                  {result.spaceRecovered === 0 && result.filesCleaned === 0 && result.registryFixed === 0 && result.driversRemoved === 0 && result.threatsFound === 0 && result.privacyIssues === 0 && result.startupHighImpact === 0 && result.updatesAvailable === 0 && (
-                    <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{t('resultSystemAlreadyClean')}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Proactive Alerts ─────────────────────────── */}
-        <ProactiveAlertsCard />
-
-        {/* ── Storage Overview ─────────────────────────── */}
-        <div
-          className="glass-card rounded-2xl p-5"
-        >
-          <h3 className="mb-5 text-[12px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-            {t('storageOverviewHeading')}
-          </h3>
-          <div className="space-y-5">
-            {drives.length === 0 && (
-              <p className="py-4 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
-                {t('storageOverviewEmpty')}
-              </p>
-            )}
-            {drives.map((drive) => (
-              <DriveBar key={drive.letter} drive={drive} platform={platform} />
-            ))}
-          </div>
-        </div>
+        </Section>
       </div>
 
       <ConfirmDialog
@@ -750,49 +905,116 @@ export function DashboardPage() {
   )
 }
 
-// ── Mini Gauge (inline, no separate file) ────────────────────
+// ── Section wrapper (staggered entrance) ─────────────────────
 
-function MiniGauge({ icon: Icon, label, percent, detail }: {
-  icon: typeof Cpu
-  label: string
-  percent: number
-  detail: string
+function Section({ children, index }: { children: React.ReactNode; index: number }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.06 * index }}
+    >
+      {children}
+    </motion.section>
+  )
+}
+
+// ── Section heading ──────────────────────────────────────────
+
+function SectionHeading({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      {Icon && <Icon className="h-3.5 w-3.5" style={{ color: 'var(--text-faint)' }} strokeWidth={1.8} />}
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-faint)' }}>
+        {title}
+      </h2>
+      <div className="h-px flex-1" style={{ background: 'var(--border-subtle)' }} />
+    </div>
+  )
+}
+
+// ── Info row (system overview) ───────────────────────────────
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2.5">
+      <span className="shrink-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span className="truncate text-[12px] font-medium text-zinc-200" title={value}>{value}</span>
+    </div>
+  )
+}
+
+// ── Trend chart card ─────────────────────────────────────────
+
+function TrendCard({ title, color, hasData, children }: { title: string; color: string; hasData: boolean; children: React.ReactNode }) {
+  const { t } = useTranslation('dashboard')
+  return (
+    <div className="glass-card glass-card-hover rounded-2xl px-5 py-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold text-zinc-200">{title}</h3>
+        <div className="flex items-center gap-2.5">
+          <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>{t('chartSampleEvery')}</span>
+          <span
+            className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide"
+            style={{ background: 'var(--bg-subtle-2)', color }}
+          >
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: color }} />
+            {t('chartLive')}
+          </span>
+        </div>
+      </div>
+      {hasData ? children : (
+        <div className="flex h-[120px] items-center justify-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          {t('chartNoData')}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Lightweight trend chart (recharts) ───────────────────────
+
+function TrendChart({ data, dataKey, color, unit }: {
+  data: Array<{ cpu: number; mem: number }>
+  dataKey: 'cpu' | 'mem'
+  color: string
+  unit: string
 }) {
-  const clamped = Math.max(0, Math.min(100, percent))
-  const color = gaugeColor(clamped)
-  const SIZE = 52
-  const STROKE = 3.5
-  const R = (SIZE - STROKE * 2) / 2
-  const C = 2 * Math.PI * R
-  const offset = C - (clamped / 100) * C
-  const gradientId = `mini-gauge-${label.replace(/\s+/g, '-')}`
+  const chartData = data.map((d, i) => ({ i, value: d[dataKey] }))
+  const gradientId = `dash-trend-${dataKey}`
 
   return (
-    <div
-      className="glass-card glass-card-hover flex items-center gap-3.5 rounded-xl px-4 py-3.5"
-    >
-      <div className="relative inline-flex shrink-0 items-center justify-center">
-        <svg width={SIZE} height={SIZE} className="-rotate-90">
-          <defs>
-            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor={color} stopOpacity="1" />
-              <stop offset="100%" stopColor={color} stopOpacity="0.5" />
-            </linearGradient>
-          </defs>
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="var(--gauge-track)" strokeWidth={STROKE} />
-          <circle
-            cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke={`url(#${gradientId})`} strokeWidth={STROKE}
-            strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset}
-            style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.16,1,0.3,1)' }}
-          />
-        </svg>
-        <Icon className="absolute h-4 w-4" style={{ color }} strokeWidth={1.8} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-zinc-200">{label}</p>
-        <p className="truncate text-[11px]" style={{ color: 'var(--text-secondary)' }}>{detail}</p>
-      </div>
-    </div>
+    <ResponsiveContainer width="100%" height={120}>
+      <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="i" hide />
+        <YAxis hide domain={[0, 100]} />
+        <Tooltip
+          contentStyle={{
+            background: '#1e1e24',
+            border: '1px solid var(--border-strong)',
+            borderRadius: '10px',
+            fontSize: '12px',
+            color: 'var(--text-primary)'
+          }}
+          labelFormatter={() => ''}
+          formatter={(val) => [`${Number(val).toFixed(0)}${unit}`]}
+        />
+        <Area
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          fill={`url(#${gradientId})`}
+          strokeWidth={2}
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
   )
 }
 

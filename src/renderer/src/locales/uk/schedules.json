@@ -23,7 +23,8 @@
     "noTasksSelected": "Завдання не вибрано",
     "nextRun": "Наступний: {{time}}",
     "lastRun": "Останній: {{time}}",
-    "neverRun": "Ніколи не запускався"
+    "neverRun": "Ніколи не запускався",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Виберіть шаблон",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Щомісячне глибоке обслуговування",
     "monthlyDeepMaintenanceDescription": "Повне очищення + реєстр, драйвери та програми 1-го числа о 10:00",
     "customLabel": "Власний",
-    "customDescription": "Почніть з нуля з порожнім розкладом"
+    "customDescription": "Почніть з нуля з порожнім розкладом",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Редагувати розклад",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Дії виконуватимуться автоматично за розкладом. Переконайтеся, що список винятків актуальний.",
     "cancelButton": "Скасувати",
     "saveChangesButton": "Зберегти зміни",
-    "createScheduleButton": "Створити розклад"
+    "createScheduleButton": "Створити розклад",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Система",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} год тому",
     "daysAgo": "{{count}} дн. тому"
   },
-  "copyNameSuffix": "(копія)"
+  "copyNameSuffix": "(копія)",
+  "runNowStarted": "Started \"{{name}}\""
 }

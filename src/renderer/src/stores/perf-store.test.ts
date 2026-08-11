@@ -6,7 +6,7 @@ function makeHealth(): HardwareHealthSnapshot {
   return {
     timestamp: Date.now(),
     cpuTemperature: 61,
-    gpuTemperatures: [{ name: 'Apple M2', temperature: 55 }],
+    gpus: [{ name: 'Apple M2', temperature: 55, loadPercent: 40, vramBytes: 12 * 1024 ** 3 }],
     battery: { present: true, percent: 82, isCharging: true, acConnected: true, timeRemainingSec: 0, cycleCount: 128, healthPercent: 94 },
   }
 }
@@ -16,6 +16,7 @@ function makeSnapshot(timestamp: number): PerfSnapshot {
     timestamp,
     cpu: { overall: 50, perCore: [50] },
     memory: { usedBytes: 4e9, totalBytes: 8e9, cachedBytes: 1e9, percent: 50 },
+    swap: { usedBytes: 1e9, totalBytes: 4e9, percent: 25 },
     disk: { readBytesPerSec: 1e6, writeBytesPerSec: 5e5 },
     network: { rxBytesPerSec: 1e4, txBytesPerSec: 5e3 },
     uptime: 3600,
@@ -82,11 +83,6 @@ describe('perf-store', () => {
     expect(state.processSortDir).toBe('desc')
   })
 
-  it('setTimeRange updates time range', () => {
-    usePerfStore.getState().setTimeRange('15m')
-    expect(usePerfStore.getState().timeRange).toBe('15m')
-  })
-
   it('setProcessFilter updates filter', () => {
     usePerfStore.getState().setProcessFilter('chrome')
     expect(usePerfStore.getState().processFilter).toBe('chrome')
@@ -99,6 +95,9 @@ describe('perf-store', () => {
       cpuThreads: 16,
       totalMemBytes: 16e9,
       osVersion: 'Win11',
+      platform: 'win32',
+      kernel: '10.0.26100',
+      arch: 'x64',
       hostname: 'TEST',
     })
     usePerfStore.getState().pushSnapshot(makeSnapshot(1))

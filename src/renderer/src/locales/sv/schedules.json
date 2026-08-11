@@ -23,7 +23,8 @@
     "noTasksSelected": "Inga uppgifter valda",
     "nextRun": "Nästa: {{time}}",
     "lastRun": "Senaste: {{time}}",
-    "neverRun": "Aldrig körd"
+    "neverRun": "Aldrig körd",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Välj en mall",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Månatligt djupt underhåll",
     "monthlyDeepMaintenanceDescription": "Fullständig rensning + register, drivrutiner och programvara den 1:a kl. 10:00",
     "customLabel": "Anpassat",
-    "customDescription": "Börja från början med ett tomt schema"
+    "customDescription": "Börja från början med ett tomt schema",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Redigera schema",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Åtgärder körs automatiskt enligt schemat. Kontrollera att undantagslistan är uppdaterad.",
     "cancelButton": "Avbryt",
     "saveChangesButton": "Spara ändringar",
-    "createScheduleButton": "Skapa schema"
+    "createScheduleButton": "Skapa schema",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "System",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} h sedan",
     "daysAgo": "{{count}} d sedan"
   },
-  "copyNameSuffix": "(kopia)"
+  "copyNameSuffix": "(kopia)",
+  "runNowStarted": "Started \"{{name}}\""
 }

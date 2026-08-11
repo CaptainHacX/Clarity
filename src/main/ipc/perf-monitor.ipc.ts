@@ -94,20 +94,27 @@ export function registerPerfMonitorIpc(getWindow: () => Electron.BrowserWindow |
 
   ipcMain.handle(IPC.PERF_GET_SYSTEM_INFO, () => service.getSystemInfo())
 
-  ipcMain.handle(IPC.PERF_START_MONITORING, (event) => {
+  ipcMain.handle(IPC.PERF_START_MONITORING, (event, intervalMs?: number) => {
     rendererRequestedMonitoring = true
 
     // Attach hide/show listeners to the current window if not already attached
     const win = getWindow()
     if (win) attachWindowListeners(win)
 
-    return service.startMonitoring(event.sender)
+    return service.startMonitoring(event.sender, undefined, intervalMs)
   })
 
   ipcMain.handle(IPC.PERF_STOP_MONITORING, () => {
     rendererRequestedMonitoring = false
     service.stopMonitoring()
   })
+
+  ipcMain.handle(IPC.PERF_SET_REFRESH_INTERVAL, (_event, intervalMs: number) => {
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) return
+    service.setRefreshInterval(intervalMs)
+  })
+
+  ipcMain.handle(IPC.PERF_REFRESH_NOW, () => service.refreshNow())
 
   ipcMain.handle(IPC.PERF_KILL_PROCESS, async (_event, pid: number) => {
     // Validate pid is a positive integer and not a critical system process

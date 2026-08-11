@@ -20,7 +20,7 @@ interface ServiceState {
   searchQuery: string
   safetyFilter: 'all' | ServiceSafety
   categoryFilter: 'all' | ServiceCategory
-  statusFilter: 'all' | 'running' | 'stopped' | 'disabled'
+  statusFilter: 'all' | 'running' | 'stopped' | 'disabled' | 'at-risk'
 
   /** Startup type a disabled service is restored to when it is re-enabled. */
   enableStartType: 'Manual' | 'Automatic'
@@ -37,7 +37,7 @@ interface ServiceState {
   setSearchQuery: (query: string) => void
   setSafetyFilter: (filter: 'all' | ServiceSafety) => void
   setCategoryFilter: (filter: 'all' | ServiceCategory) => void
-  setStatusFilter: (filter: 'all' | 'running' | 'stopped' | 'disabled') => void
+  setStatusFilter: (filter: 'all' | 'running' | 'stopped' | 'disabled' | 'at-risk') => void
   setEnableStartType: (startType: 'Manual' | 'Automatic') => void
 
   toggleService: (name: string) => void

@@ -23,7 +23,8 @@
     "noTasksSelected": "Chưa chọn tác vụ nào",
     "nextRun": "Tiếp theo: {{time}}",
     "lastRun": "Lần cuối: {{time}}",
-    "neverRun": "Chưa từng chạy"
+    "neverRun": "Chưa từng chạy",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Chọn mẫu",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Bảo trì chuyên sâu hằng tháng",
     "monthlyDeepMaintenanceDescription": "Dọn dẹp toàn bộ + registry, driver và phần mềm vào ngày 1 lúc 10:00 SA",
     "customLabel": "Tùy chỉnh",
-    "customDescription": "Bắt đầu từ đầu với một lịch biểu trống"
+    "customDescription": "Bắt đầu từ đầu với một lịch biểu trống",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Chỉnh sửa lịch biểu",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Các hành động sẽ tự động chạy theo lịch. Hãy bảo đảm danh sách loại trừ của bạn đã được cập nhật.",
     "cancelButton": "Hủy",
     "saveChangesButton": "Lưu thay đổi",
-    "createScheduleButton": "Tạo lịch biểu"
+    "createScheduleButton": "Tạo lịch biểu",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Hệ thống",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} giờ trước",
     "daysAgo": "{{count}} ngày trước"
   },
-  "copyNameSuffix": "(bản sao)"
+  "copyNameSuffix": "(bản sao)",
+  "runNowStarted": "Started \"{{name}}\""
 }

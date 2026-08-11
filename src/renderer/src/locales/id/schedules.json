@@ -23,7 +23,8 @@
     "noTasksSelected": "Tidak ada tugas yang dipilih",
     "nextRun": "Berikutnya: {{time}}",
     "lastRun": "Terakhir: {{time}}",
-    "neverRun": "Belum pernah dijalankan"
+    "neverRun": "Belum pernah dijalankan",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Pilih templat",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Pemeliharaan Mendalam Bulanan",
     "monthlyDeepMaintenanceDescription": "Pembersihan penuh + registry, driver & perangkat lunak setiap tanggal 1 pukul 10.00",
     "customLabel": "Kustom",
-    "customDescription": "Mulai dari awal dengan jadwal kosong"
+    "customDescription": "Mulai dari awal dengan jadwal kosong",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Edit Jadwal",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Tindakan akan dijalankan secara otomatis sesuai jadwal. Pastikan daftar pengecualian Anda sudah diperbarui.",
     "cancelButton": "Batal",
     "saveChangesButton": "Simpan Perubahan",
-    "createScheduleButton": "Buat Jadwal"
+    "createScheduleButton": "Buat Jadwal",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Sistem",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}}j yang lalu",
     "daysAgo": "{{count}}h yang lalu"
   },
-  "copyNameSuffix": "(salinan)"
+  "copyNameSuffix": "(salinan)",
+  "runNowStarted": "Started \"{{name}}\""
 }

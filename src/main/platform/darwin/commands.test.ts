@@ -169,8 +169,10 @@ describe('darwin commands', () => {
       expect(apps).toHaveLength(2)
       expect(apps[0].name).toBe('Slack')
       expect(apps[0].sizeKb).toBe(524288)
+      expect(apps[0].path).toBe('/Applications/Slack.app')
       expect(apps[1].name).toBe('Firefox')
       expect(apps[1].sizeKb).toBe(102400)
+      expect(apps[1].path).toBe('/Applications/Firefox.app')
     })
 
     it('handles du failure gracefully and returns 0 for sizes', async () => {
@@ -193,6 +195,7 @@ describe('darwin commands', () => {
       const apps = await commands.getInstalledApps()
       expect(apps).toHaveLength(1)
       expect(apps[0].sizeKb).toBe(0)
+      expect(apps[0].path).toBe('/Applications/Slack.app')
     })
 
     it('parses partial du output from error object', async () => {

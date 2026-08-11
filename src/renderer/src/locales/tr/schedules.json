@@ -23,7 +23,8 @@
     "noTasksSelected": "Görev seçilmedi",
     "nextRun": "Sonraki: {{time}}",
     "lastRun": "Son: {{time}}",
-    "neverRun": "Hiç çalıştırılmadı"
+    "neverRun": "Hiç çalıştırılmadı",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Bir şablon seçin",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Aylık Derin Bakım",
     "monthlyDeepMaintenanceDescription": "Her ayın 1'inde saat 10:00'da tam temizlik + kayıt defteri, sürücüler ve yazılımlar",
     "customLabel": "Özel",
-    "customDescription": "Boş bir zamanlamayla sıfırdan başlayın"
+    "customDescription": "Boş bir zamanlamayla sıfırdan başlayın",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Zamanlamayı Düzenle",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "İşlemler zamanlamaya göre otomatik olarak çalıştırılacaktır. Hariç tutma listenizin güncel olduğundan emin olun.",
     "cancelButton": "İptal",
     "saveChangesButton": "Değişiklikleri Kaydet",
-    "createScheduleButton": "Zamanlama Oluştur"
+    "createScheduleButton": "Zamanlama Oluştur",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Sistem",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} sa önce",
     "daysAgo": "{{count}} g önce"
   },
-  "copyNameSuffix": "(kopya)"
+  "copyNameSuffix": "(kopya)",
+  "runNowStarted": "Started \"{{name}}\""
 }

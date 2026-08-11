@@ -113,6 +113,7 @@ export const IPC = {
   // Multi-schedule
   SCHEDULE_RUN_TRIGGER: 'schedule:run-trigger',
   SCHEDULE_RUN_COMPLETE: 'schedule:run-complete',
+  SCHEDULE_RUN_NOW: 'schedule:run-now',
 
   // Settings apply (renderer -> main)
   SETTINGS_APPLY_STARTUP: 'settings:apply-startup',
@@ -169,8 +170,11 @@ export const IPC = {
   PERF_GET_SYSTEM_INFO: 'perf:system-info',
   PERF_START_MONITORING: 'perf:start',
   PERF_STOP_MONITORING: 'perf:stop',
+  PERF_SET_REFRESH_INTERVAL: 'perf:set-refresh-interval',
+  PERF_REFRESH_NOW: 'perf:refresh-now',
   PERF_SNAPSHOT: 'perf:snapshot',
   PERF_PROCESS_LIST: 'perf:process-list',
+  PERF_DISK_VOLUMES: 'perf:disk-volumes',
   PERF_KILL_PROCESS: 'perf:kill',
   PERF_DISK_HEALTH: 'perf:disk-health',
   PERF_HARDWARE_HEALTH: 'perf:hardware-health',

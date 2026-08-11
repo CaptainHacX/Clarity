@@ -23,7 +23,8 @@
     "noTasksSelected": "لم يتم تحديد أي مهام",
     "nextRun": "التالي: {{time}}",
     "lastRun": "الأخير: {{time}}",
-    "neverRun": "لم يتم التشغيل مطلقًا"
+    "neverRun": "لم يتم التشغيل مطلقًا",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "اختر قالبًا",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "صيانة عميقة شهرية",
     "monthlyDeepMaintenanceDescription": "تنظيف كامل + السجل وبرامج التشغيل والبرامج في اليوم الأول الساعة 10 صباحًا",
     "customLabel": "مخصص",
-    "customDescription": "ابدأ من الصفر بجدول فارغ"
+    "customDescription": "ابدأ من الصفر بجدول فارغ",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "تحرير الجدول",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "سيتم تنفيذ الإجراءات تلقائيًا وفق الجدول الزمني. تأكد من أن قائمة الاستثناءات لديك محدثة.",
     "cancelButton": "إلغاء",
     "saveChangesButton": "حفظ التغييرات",
-    "createScheduleButton": "إنشاء جدول"
+    "createScheduleButton": "إنشاء جدول",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "النظام",
@@ -96,5 +104,6 @@
     "hoursAgo": "منذ {{count}} س",
     "daysAgo": "منذ {{count}} ي"
   },
-  "copyNameSuffix": "(نسخة)"
+  "copyNameSuffix": "(نسخة)",
+  "runNowStarted": "Started \"{{name}}\""
 }

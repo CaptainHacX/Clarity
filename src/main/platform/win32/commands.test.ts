@@ -178,7 +178,7 @@ describe('win32 commands', () => {
     it('parses installed apps from powershell output', async () => {
       execFileMock.mockResolvedValue({
         stdout: JSON.stringify([
-          { DisplayName: 'App1', DisplayVersion: '1.0', Publisher: 'Pub', InstallDate: '20240101', EstimatedSize: 1024 },
+          { DisplayName: 'App1', DisplayVersion: '1.0', Publisher: 'Pub', InstallDate: '20240101', EstimatedSize: 1024, InstallLocation: 'C:\\Program Files\\App1' },
         ]),
         stderr: '',
       })
@@ -191,6 +191,7 @@ describe('win32 commands', () => {
         publisher: 'Pub',
         installDate: '20240101',
         sizeKb: 1024,
+        path: 'C:\\Program Files\\App1',
       }])
     })
 
@@ -203,7 +204,7 @@ describe('win32 commands', () => {
 
     it('handles single-object output', async () => {
       execFileMock.mockResolvedValue({
-        stdout: JSON.stringify({ DisplayName: 'Solo', DisplayVersion: null, Publisher: null, InstallDate: null, EstimatedSize: null }),
+        stdout: JSON.stringify({ DisplayName: 'Solo', DisplayVersion: null, Publisher: null, InstallDate: null, EstimatedSize: null, InstallLocation: null }),
         stderr: '',
       })
 
@@ -215,6 +216,7 @@ describe('win32 commands', () => {
         publisher: '',
         installDate: '',
         sizeKb: 0,
+        path: '',
       })
     })
   })

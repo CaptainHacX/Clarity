@@ -24,12 +24,24 @@ vi.mock('../services/linux-firewall', () => ({
   collectLinuxFirewallStatus: (...args: unknown[]) => mockCollectLinuxFirewallStatus(...args),
 }))
 
-import { scanFirewallRules, applyFirewallChanges, parseDarwinAppLine } from './firewall-audit.ipc'
+import {
+  scanFirewallRules,
+  applyFirewallChanges,
+  parseDarwinAppLine,
+  normalizeDarwinListOutput,
+} from './firewall-audit.ipc'
 
 const originalPlatform = process.platform
 
 function setPlatform(p: string): void {
   Object.defineProperty(process, 'platform', { value: p, configurable: true })
+}
+
+function setUid(uid: number | null): void {
+  Object.defineProperty(process, 'getuid', {
+    value: uid === null ? undefined : () => uid,
+    configurable: true,
+  })
 }
 
 function resolveExecFile(stdout: string): void {
@@ -40,6 +52,7 @@ beforeEach(() => {
   mockExecFile.mockReset()
   mockCollectLinuxFirewallStatus.mockReset()
   setPlatform('darwin')
+  setUid(501)
 })
 
 afterEach(() => {
@@ -62,8 +75,9 @@ describe('parseDarwinAppLine', () => {
       .toEqual({ id: '99', path: '/Applications/App (Free).app', allow: true })
   })
 
-  it('skips blocked apps', () => {
-    expect(parseDarwinAppLine('42 : /Applications/Steam.app    ( Block incoming connections )')).toBeNull()
+  it('parses blocked apps with allow:false so they can be re-allowed later', () => {
+    expect(parseDarwinAppLine('42 : /Applications/Steam.app    ( Block incoming connections )'))
+      .toEqual({ id: '42', path: '/Applications/Steam.app', allow: false })
   })
 
   it('skips apps with no effective rule', () => {
@@ -81,6 +95,27 @@ describe('parseDarwinAppLine', () => {
   })
 })
 
+describe('normalizeDarwinListOutput', () => {
+  it('folds the mode line into its app line and drops the header', () => {
+    const raw = [
+      'Total number of apps = 2',
+      '  6 : /Applications/Google Chrome.app',
+      '             ( Block incoming connections )',
+      '  1 : /Applications/Netfox.app',
+      '             ( Allow incoming connections )',
+    ].join('\n')
+    expect(normalizeDarwinListOutput(raw)).toEqual([
+      '6 : /Applications/Google Chrome.app ( Block incoming connections )',
+      '1 : /Applications/Netfox.app ( Allow incoming connections )',
+    ])
+  })
+
+  it('leaves single-line entries untouched', () => {
+    expect(normalizeDarwinListOutput('42 : /Applications/Steam.app ( Allow incoming connections )'))
+      .toEqual(['42 : /Applications/Steam.app ( Allow incoming connections )'])
+  })
+})
+
 describe('scanFirewallRules on macOS', () => {
   it('returns empty when the global firewall is disabled', async () => {
     resolveExecFile('Firewall is disabled. (State = 0)')
@@ -89,17 +124,23 @@ describe('scanFirewallRules on macOS', () => {
     expect(result.totalCount).toBe(0)
   })
 
-  it('builds a rule per allowed app, flagging stale paths as high risk', async () => {
+  it('builds a rule per app, including blocked apps as clean low-risk entries', async () => {
     mockExecFile.mockImplementation((file: string, args: string[]) => {
       if (args.includes('--getglobalstate')) {
         return Promise.resolve({ stdout: 'Firewall is enabled. (State = 2)', stderr: '' })
       }
       if (args.includes('--listapps')) {
+        // Real socketfilterfw output: path and mode on separate lines, plus a
+        // "Total number of apps" header that must be skipped.
         return Promise.resolve({
           stdout: [
-            '  1234 : /Applications/ClarityTestApp-DoesNotExist.app    ( Allow incoming connections )',
-            '  5678 : /usr/bin/true    ( Allow incoming connections )',
-            '  42 : /Applications/Blocked.app    ( Block incoming connections )',
+            'Total number of apps = 3',
+            '  1234 : /Applications/ClarityTestApp-DoesNotExist.app',
+            '             ( Allow incoming connections )',
+            '  5678 : /usr/bin/true',
+            '             ( Allow incoming connections )',
+            '  42 : /Applications/Blocked.app',
+            '             ( Block incoming connections )',
             '  /Applications/NotAnAppLine.app',
           ].join('\n'),
           stderr: '',
@@ -109,8 +150,8 @@ describe('scanFirewallRules on macOS', () => {
     })
 
     const result = await scanFirewallRules()
-    expect(result.totalCount).toBe(2)
-    expect(result.rules).toHaveLength(2)
+    expect(result.totalCount).toBe(3)
+    expect(result.rules).toHaveLength(3)
 
     // Third-party app under a nonexistent path → stale, high.
     const chrome = result.rules[0]
@@ -124,6 +165,12 @@ describe('scanFirewallRules on macOS', () => {
     expect(agent.builtin).toBe(true)
     expect(agent.risk).toBe('low')
     expect(agent.issues).toEqual([])
+
+    // Blocked app → listed so it can be re-allowed, but carries no exposure.
+    const blocked = result.rules[2]
+    expect(blocked.enabled).toBe(false)
+    expect(blocked.risk).toBe('low')
+    expect(blocked.issues).toEqual([])
     expect(result.staleCount).toBe(1)
   })
 
@@ -145,28 +192,57 @@ describe('scanFirewallRules on macOS', () => {
 })
 
 describe('applyFirewallChanges on macOS', () => {
-  it('blocks an app by passing its path as an argument', async () => {
+  it('blocks an app directly via --blockapp, with no elevation', async () => {
     resolveExecFile('')
     const result = await applyFirewallChanges([
       { name: '/Applications/Google Chrome.app', action: 'disable' },
     ])
     expect(result.succeeded).toBe(1)
     expect(result.failed).toBe(0)
-    expect(mockExecFile).toHaveBeenCalledWith(
-      '/usr/libexec/ApplicationFirewall/socketfilterfw',
-      ['--setappmode', '/Applications/Google Chrome.app', 'block'],
-      expect.objectContaining({ timeout: 15_000 })
-    )
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+    const [file, args] = mockExecFile.mock.calls[0]
+    expect(file).toBe('/usr/libexec/ApplicationFirewall/socketfilterfw')
+    expect(args).toEqual(['--blockapp', '/Applications/Google Chrome.app'])
   })
 
-  it('reports a failure when blocking requires privileges the process lacks', async () => {
+  it('allows a previously blocked app via --unblockapp', async () => {
+    resolveExecFile('')
+    const result = await applyFirewallChanges([
+      { name: '/Applications/Google Chrome.app', action: 'enable' },
+    ])
+    expect(result.succeeded).toBe(1)
+    expect(result.failed).toBe(0)
+    const [file, args] = mockExecFile.mock.calls[0]
+    expect(file).toBe('/usr/libexec/ApplicationFirewall/socketfilterfw')
+    expect(args).toEqual(['--unblockapp', '/Applications/Google Chrome.app'])
+  })
+
+  it('handles multiple apps in one apply, per-app success/failure', async () => {
+    mockExecFile
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockRejectedValueOnce(new Error('Failed to set application mode'))
+    const result = await applyFirewallChanges([
+      { name: '/Applications/AppA.app', action: 'disable' },
+      { name: '/Applications/AppB.app', action: 'disable' },
+    ])
+    expect(result.succeeded).toBe(1)
+    expect(result.failed).toBe(1)
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0].name).toBe('/Applications/AppB.app')
+    expect(mockExecFile.mock.calls.map(([, args]) => args)).toEqual([
+      ['--blockapp', '/Applications/AppA.app'],
+      ['--blockapp', '/Applications/AppB.app'],
+    ])
+  })
+
+  it('reports a failure when socketfilterfw rejects the app', async () => {
     mockExecFile.mockRejectedValue(new Error('Operation not permitted'))
     const result = await applyFirewallChanges([
       { name: '/Applications/SomeApp.app', action: 'disable' },
     ])
     expect(result.succeeded).toBe(0)
     expect(result.failed).toBe(1)
-    expect(result.errors[0].reason).toMatch(/administrator privileges/i)
+    expect(result.errors[0].reason).toMatch(/failed to block/i)
   })
 
   it('rejects non-absolute rule names without shelling out', async () => {
@@ -237,8 +313,9 @@ describe('scanFirewallRules on Linux', () => {
 })
 
 describe('applyFirewallChanges on Linux', () => {
-  it('deletes a ufw allow rule for a validated port', async () => {
+  it('deletes a ufw allow rule directly when already root', async () => {
     setPlatform('linux')
+    setUid(0)
     mockCollectLinuxFirewallStatus.mockResolvedValue({
       tool: 'ufw',
       active: true,
@@ -255,6 +332,28 @@ describe('applyFirewallChanges on Linux', () => {
       '/usr/sbin/ufw',
       ['delete', 'allow', '22'],
       expect.objectContaining({ timeout: 15_000 })
+    )
+  })
+
+  it('elevates through pkexec when the process is not root', async () => {
+    setPlatform('linux')
+    setUid(501)
+    mockCollectLinuxFirewallStatus.mockResolvedValue({
+      tool: 'ufw',
+      active: true,
+      allowedPorts: [22],
+      rawRules: '',
+    })
+    resolveExecFile('Rule deleted')
+    const result = await applyFirewallChanges([
+      { name: 'port-22', action: 'disable' },
+    ])
+    expect(result.succeeded).toBe(1)
+    expect(result.failed).toBe(0)
+    expect(mockExecFile).toHaveBeenCalledWith(
+      '/usr/bin/pkexec',
+      ['/usr/sbin/ufw', 'delete', 'allow', '22'],
+      expect.objectContaining({ timeout: 60_000 })
     )
   })
 

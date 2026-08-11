@@ -23,7 +23,8 @@
     "noTasksSelected": "कोई कार्य चयनित नहीं है",
     "nextRun": "अगला: {{time}}",
     "lastRun": "पिछला: {{time}}",
-    "neverRun": "कभी नहीं चला"
+    "neverRun": "कभी नहीं चला",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "एक टेम्पलेट चुनें",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "मासिक गहन रखरखाव",
     "monthlyDeepMaintenanceDescription": "हर महीने की 1 तारीख को सुबह 10 बजे पूर्ण सफ़ाई + registry, driver और software",
     "customLabel": "कस्टम",
-    "customDescription": "खाली शेड्यूल से शुरुआत करें"
+    "customDescription": "खाली शेड्यूल से शुरुआत करें",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "शेड्यूल संपादित करें",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "कार्रवाइयाँ शेड्यूल के अनुसार स्वचालित रूप से चलेंगी। सुनिश्चित करें कि आपकी बहिष्करण सूची अद्यतन है।",
     "cancelButton": "रद्द करें",
     "saveChangesButton": "परिवर्तन सहेजें",
-    "createScheduleButton": "शेड्यूल बनाएँ"
+    "createScheduleButton": "शेड्यूल बनाएँ",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "सिस्टम",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}}h पहले",
     "daysAgo": "{{count}}d पहले"
   },
-  "copyNameSuffix": "(प्रतिलिपि)"
+  "copyNameSuffix": "(प्रतिलिपि)",
+  "runNowStarted": "Started \"{{name}}\""
 }

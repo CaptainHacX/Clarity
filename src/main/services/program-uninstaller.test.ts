@@ -1224,8 +1224,8 @@ describe('getInstalledProgramsFull', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' })
 
     const mockApps = [
-      { name: 'Firefox', publisher: 'Mozilla', version: '120.0', installDate: '2024-01-01', sizeKb: 500 },
-      { name: 'Chrome', publisher: 'Google', version: '119.0', installDate: '', sizeKb: 0 },
+      { name: 'Firefox', publisher: 'Mozilla', version: '120.0', installDate: '2024-01-01', sizeKb: 500, path: '/Applications/Firefox.app' },
+      { name: 'Chrome', publisher: 'Google', version: '119.0', installDate: '', sizeKb: 0, path: '' },
     ]
 
     mockGetPlatform.mockReturnValue({
@@ -1240,5 +1240,35 @@ describe('getInstalledProgramsFull', () => {
     expect(programs[1].displayName).toBe('Firefox')
     expect(programs[1].estimatedSize).toBe(500 * 1024)
     expect(programs[1].lastUsed).toBe(-1)
+    expect(programs[1].installLocation).toBe('/Applications/Firefox.app')
+    expect(programs[0].installLocation).toBe('')
+  })
+
+  it('deduplicates apps reported from multiple locations on non-win32', async () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' })
+
+    const mockApps = [
+      // Staging copy under ~/Library (in_progress) — should be dropped
+      { name: 'Docker', publisher: 'Docker Inc', version: '4.84.0', installDate: '', sizeKb: 300000, path: '/Users/koushik/Library/Application Support/com.docker.install/in_progress/Docker.app' },
+      // Real install on an external volume — should be kept
+      { name: 'Docker', publisher: 'Docker Inc', version: '4.83.0', installDate: '', sizeKb: 200000, path: '/Volumes/Ext_Data/Applications/Docker.app' },
+      // Genuinely distinct program with the same name but a different publisher
+      { name: 'Java', publisher: 'Oracle Corporation', version: '17', installDate: '', sizeKb: 1000, path: '/Library/Java/JavaVirtualMachines/jdk.jdk' },
+      { name: 'Java', publisher: 'Amazon', version: '17', installDate: '', sizeKb: 800, path: '/Library/Java/JavaVirtualMachines/amazon.jdk' },
+    ]
+
+    mockGetPlatform.mockReturnValue({
+      commands: { getInstalledApps: vi.fn().mockResolvedValue(mockApps) },
+      paths: { uninstallLeftoverDirs: () => [] },
+    })
+
+    const programs = await getInstalledProgramsFull()
+    expect(programs).toHaveLength(3)
+    const docker = programs.find((p) => p.displayName === 'Docker')
+    expect(docker).toBeDefined()
+    expect(docker!.installLocation).toBe('/Volumes/Ext_Data/Applications/Docker.app')
+    expect(docker!.displayVersion).toBe('4.83.0')
+    // Distinct publishers must not be collapsed together
+    expect(programs.filter((p) => p.displayName === 'Java')).toHaveLength(2)
   })
 })

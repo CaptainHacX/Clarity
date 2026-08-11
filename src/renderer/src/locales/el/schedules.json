@@ -23,7 +23,8 @@
     "noTasksSelected": "Δεν έχουν επιλεγεί εργασίες",
     "nextRun": "Επόμενη: {{time}}",
     "lastRun": "Τελευταία: {{time}}",
-    "neverRun": "Δεν εκτελέστηκε ποτέ"
+    "neverRun": "Δεν εκτελέστηκε ποτέ",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Επιλέξτε ένα πρότυπο",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Μηνιαία βαθιά συντήρηση",
     "monthlyDeepMaintenanceDescription": "Πλήρης καθαρισμός + μητρώο, προγράμματα οδήγησης και λογισμικό την 1η κάθε μήνα στις 10 π.μ.",
     "customLabel": "Προσαρμοσμένο",
-    "customDescription": "Ξεκινήστε από την αρχή με έναν κενό προγραμματισμό"
+    "customDescription": "Ξεκινήστε από την αρχή με έναν κενό προγραμματισμό",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Επεξεργασία προγραμματισμού",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Οι ενέργειες θα εκτελούνται αυτόματα σύμφωνα με το πρόγραμμα. Βεβαιωθείτε ότι η λίστα εξαιρέσεών σας είναι ενημερωμένη.",
     "cancelButton": "Ακύρωση",
     "saveChangesButton": "Αποθήκευση αλλαγών",
-    "createScheduleButton": "Δημιουργία προγραμματισμού"
+    "createScheduleButton": "Δημιουργία προγραμματισμού",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Σύστημα",
@@ -96,5 +104,6 @@
     "hoursAgo": "πριν από {{count}} ώ.",
     "daysAgo": "πριν από {{count}} ημ."
   },
-  "copyNameSuffix": "(αντίγραφο)"
+  "copyNameSuffix": "(αντίγραφο)",
+  "runNowStarted": "Started \"{{name}}\""
 }

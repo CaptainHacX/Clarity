@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   CalendarClock, Plus, Clock, CheckCircle2, XCircle, Minus,
   Pencil, Trash2, Copy, Sparkles, Database, Globe, AppWindow,
-  Gamepad2, Trash, Monitor, Download, Zap, AlertTriangle, X
+  Gamepad2, Trash, Monitor, Download, Zap, AlertTriangle, X,
+  Play, SlidersHorizontal, Check, ArrowRight, ListChecks
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -65,6 +66,8 @@ const CLEANER_TASKS = ALL_TASKS_BASE.filter((t) => t.group === 'cleaner').map((t
 interface Preset {
   label: string
   description: string
+  icon: typeof Sparkles
+  recommended?: boolean
   entry: Partial<ScheduleEntry>
 }
 
@@ -74,6 +77,8 @@ function buildPresets(availableTasks: TaskDef[], t: (key: string) => string): Pr
     {
       label: t('presets.weeklyFullCleanLabel'),
       description: t('presets.weeklyFullCleanDescription'),
+      icon: CalendarClock,
+      recommended: true,
       entry: {
         name: t('presets.weeklyFullCleanLabel'),
         frequency: 'weekly',
@@ -87,6 +92,7 @@ function buildPresets(availableTasks: TaskDef[], t: (key: string) => string): Pr
     {
       label: t('presets.dailyLightSweepLabel'),
       description: t('presets.dailyLightSweepDescription'),
+      icon: Sparkles,
       entry: {
         name: t('presets.dailyLightSweepLabel'),
         frequency: 'daily',
@@ -100,6 +106,7 @@ function buildPresets(availableTasks: TaskDef[], t: (key: string) => string): Pr
     {
       label: t('presets.monthlyDeepMaintenanceLabel'),
       description: t('presets.monthlyDeepMaintenanceDescription'),
+      icon: Zap,
       entry: {
         name: t('presets.monthlyDeepMaintenanceLabel'),
         frequency: 'monthly',
@@ -131,7 +138,6 @@ export function SchedulesPage() {
   const { t } = useTranslation('schedules')
   const { settings, updateSettings } = useSettingsStore()
   const platformTasks = usePlatformTasks()
-  const allTasks = useAllTasks()
   const presets = useMemo(() => buildPresets(platformTasks, t), [platformTasks, t])
   const schedules = settings.schedules ?? []
 
@@ -167,6 +173,7 @@ export function SchedulesPage() {
   const [showPresets, setShowPresets] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [dialogInitial, setDialogInitial] = useState<Partial<ScheduleEntry>>(makeBlankEntry())
 
   const handleNew = () => {
     if (schedules.length >= MAX_SCHEDULES) {
@@ -180,9 +187,8 @@ export function SchedulesPage() {
   const handlePresetSelect = (preset: Partial<ScheduleEntry> | null) => {
     setShowPresets(false)
     setEditingId(null)
-    setShowDialog(true)
-    // The dialog will pick up the preset via initialData
     setDialogInitial(preset ?? makeBlankEntry())
+    setShowDialog(true)
   }
 
   const handleEdit = (id: string) => {
@@ -225,6 +231,12 @@ export function SchedulesPage() {
     if (enabled) ensureBackgroundMode()
   }
 
+  const handleRunNow = (id: string) => {
+    const entry = schedules.find((s) => s.id === id)
+    window.clarity?.scheduleRunNow?.(id)
+    if (entry) toast.info(t('runNowStarted', { name: entry.name }))
+  }
+
   const handleSave = (entry: ScheduleEntry) => {
     if (editingId) {
       save(schedules.map((s) => (s.id === editingId ? entry : s)))
@@ -237,8 +249,6 @@ export function SchedulesPage() {
     toast.success(editingId ? t('updatedToast', { name: entry.name }) : t('createdToast', { name: entry.name }))
   }
 
-  const [dialogInitial, setDialogInitial] = useState<Partial<ScheduleEntry>>(makeBlankEntry())
-
   return (
     <div className="animate-fade-in">
       <PageHeader
@@ -247,8 +257,12 @@ export function SchedulesPage() {
         action={
           <button
             onClick={handleNew}
-            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-colors"
-            style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}
+            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:brightness-110"
+            style={{
+              background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+              color: 'var(--text-on-accent)',
+              boxShadow: '0 0 16px rgba(245,158,11,0.2)',
+            }}
           >
             <Plus className="h-4 w-4" strokeWidth={2.2} />
             {t('newScheduleButton')}
@@ -264,8 +278,12 @@ export function SchedulesPage() {
           action={
             <button
               onClick={handleNew}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-colors"
-              style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:brightness-110"
+              style={{
+                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                color: 'var(--text-on-accent)',
+                boxShadow: '0 0 16px rgba(245,158,11,0.2)',
+              }}
             >
               <Plus className="h-4 w-4" strokeWidth={2.2} />
               {t('createScheduleButton')}
@@ -273,7 +291,7 @@ export function SchedulesPage() {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {schedules.map((entry) => (
             <ScheduleCard
               key={entry.id}
@@ -281,6 +299,7 @@ export function SchedulesPage() {
               onToggle={(enabled) => handleToggle(entry.id, enabled)}
               onEdit={() => handleEdit(entry.id)}
               onDuplicate={() => handleDuplicate(entry.id)}
+              onRunNow={() => handleRunNow(entry.id)}
               onDelete={() => setDeleteId(entry.id)}
             />
           ))}
@@ -301,7 +320,7 @@ export function SchedulesPage() {
         <ScheduleDialog
           initial={dialogInitial}
           isEditing={!!editingId}
-          availableTasks={platformTasks}
+          existingNames={schedules.filter((s) => s.id !== editingId).map((s) => s.name)}
           onSave={handleSave}
           onClose={() => { setShowDialog(false); setEditingId(null) }}
         />
@@ -328,12 +347,14 @@ function ScheduleCard({
   onToggle,
   onEdit,
   onDuplicate,
+  onRunNow,
   onDelete
 }: {
   entry: ScheduleEntry
   onToggle: (enabled: boolean) => void
   onEdit: () => void
   onDuplicate: () => void
+  onRunNow: () => void
   onDelete: () => void
 }) {
   const { t } = useTranslation('schedules')
@@ -341,49 +362,55 @@ function ScheduleCard({
   const nextRun = useMemo(() => getNextRunTime(entry), [entry])
   const frequencyText = useMemo(() => formatFrequency(entry, t), [entry, t])
   const taskCount = entry.tasks.length
+  const visibleTasks = entry.tasks.slice(0, 4)
+  const hiddenCount = taskCount - visibleTasks.length
 
   return (
     <div
       className={cn(
-        'group rounded-2xl p-5 transition-all',
-        !entry.enabled && 'opacity-50'
+        'glass-card glass-card-hover glow-amber group relative flex flex-col rounded-2xl p-5',
+        !entry.enabled && 'opacity-60'
       )}
-      style={{ background: 'var(--card-bg)', border: '1px solid var(--border-default)' }}
     >
       {/* Top row */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <h3 className="truncate text-[15px] font-semibold text-white">{entry.name}</h3>
-            {entry.autoApply && (
-              <span
-                className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                style={{ background: 'var(--accent-muted-bg)', color: 'var(--accent)' }}
-              >
-                {t('card.autoApplyBadge')}
-              </span>
-            )}
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: 'var(--accent-muted-bg)' }}
+              aria-hidden="true"
+            >
+              <CalendarClock className="h-5 w-5" style={{ color: 'var(--accent)' }} strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="truncate text-[15px] font-semibold text-white">{entry.name}</h3>
+                {entry.autoApply && (
+                  <span
+                    className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                    style={{ background: 'var(--accent-muted-bg)', color: 'var(--accent)', border: '1px solid var(--accent-muted-border)' }}
+                  >
+                    {t('card.autoApplyBadge')}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 flex items-center gap-1.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                <Clock className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} strokeWidth={1.8} aria-hidden="true" />
+                {frequencyText}
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            {frequencyText}
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Actions — visible on hover */}
-          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <IconBtn icon={Pencil} title={t('card.editAction')} onClick={onEdit} />
-            <IconBtn icon={Copy} title={t('card.duplicateAction')} onClick={onDuplicate} />
-            <IconBtn icon={Trash2} title={t('card.deleteAction')} onClick={onDelete} color="#ef4444" />
-          </div>
-
-          <Toggle checked={entry.enabled} onChange={onToggle} />
+          <Toggle checked={entry.enabled} onChange={onToggle} label={entry.name} />
         </div>
       </div>
 
       {/* Task pills */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {entry.tasks.map((taskType) => {
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {visibleTasks.map((taskType) => {
           const def = allTasks.find((d) => d.type === taskType)
           if (!def) return null
           return (
@@ -392,45 +419,66 @@ function ScheduleCard({
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium"
               style={{ background: 'var(--bg-subtle-2)', color: 'var(--text-muted)' }}
             >
-              <def.icon className="h-3 w-3" strokeWidth={1.8} />
+              <def.icon className="h-3 w-3" strokeWidth={1.8} aria-hidden="true" />
               {def.label}
             </span>
           )
         })}
+        {hiddenCount > 0 && (
+          <span
+            className="flex items-center rounded-lg px-2.5 py-1 text-[11px] font-medium"
+            style={{ background: 'var(--bg-subtle-2)', color: 'var(--text-muted)' }}
+          >
+            +{hiddenCount}
+          </span>
+        )}
         {taskCount === 0 && (
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('card.noTasksSelected')}</span>
         )}
       </div>
 
       {/* Bottom row */}
-      <div className="mt-4 flex items-center gap-5" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-        {/* Next run */}
-        {entry.enabled && nextRun && (
-          <div className="flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} strokeWidth={1.8} />
-            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              {t('card.nextRun', { time: formatNextRun(nextRun, t) })}
+      <div
+        className="mt-4 flex items-center justify-between gap-4 border-t pt-4"
+        style={{ borderColor: 'var(--border-subtle)' }}
+      >
+        <div className="flex min-w-0 items-center gap-5">
+          {/* Next run */}
+          {entry.enabled && nextRun && (
+            <div className="flex min-w-0 items-center gap-2">
+              <Clock className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} strokeWidth={1.8} aria-hidden="true" />
+              <span className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                {t('card.nextRun', { time: formatNextRun(nextRun, t) })}
+              </span>
+            </div>
+          )}
+
+          {/* Last run */}
+          <div className="flex shrink-0 items-center gap-2">
+            {entry.lastRunStatus === 'success' && (
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: '#22c55e' }} strokeWidth={1.8} aria-hidden="true" />
+            )}
+            {entry.lastRunStatus === 'partial' && (
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: '#eab308' }} strokeWidth={1.8} aria-hidden="true" />
+            )}
+            {entry.lastRunStatus === 'failed' && (
+              <XCircle className="h-3.5 w-3.5 shrink-0" style={{ color: '#ef4444' }} strokeWidth={1.8} aria-hidden="true" />
+            )}
+            {entry.lastRunStatus === 'never' && (
+              <Minus className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--text-faint)' }} strokeWidth={1.8} aria-hidden="true" />
+            )}
+            <span className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              {entry.lastRunAt ? t('card.lastRun', { time: formatLastRun(entry.lastRunAt, t) }) : t('card.neverRun')}
             </span>
           </div>
-        )}
+        </div>
 
-        {/* Last run */}
-        <div className="flex items-center gap-2">
-          {entry.lastRunStatus === 'success' && (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: '#22c55e' }} strokeWidth={1.8} />
-          )}
-          {entry.lastRunStatus === 'partial' && (
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: '#eab308' }} strokeWidth={1.8} />
-          )}
-          {entry.lastRunStatus === 'failed' && (
-            <XCircle className="h-3.5 w-3.5 shrink-0" style={{ color: '#ef4444' }} strokeWidth={1.8} />
-          )}
-          {entry.lastRunStatus === 'never' && (
-            <Minus className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--text-faint)' }} strokeWidth={1.8} />
-          )}
-          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            {entry.lastRunAt ? t('card.lastRun', { time: formatLastRun(entry.lastRunAt, t) }) : t('card.neverRun')}
-          </span>
+        {/* Actions — visible on hover */}
+        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <IconBtn icon={Play} title={t('card.runNowAction')} onClick={onRunNow} color="var(--accent)" />
+          <IconBtn icon={Pencil} title={t('card.editAction')} onClick={onEdit} />
+          <IconBtn icon={Copy} title={t('card.duplicateAction')} onClick={onDuplicate} />
+          <IconBtn icon={Trash2} title={t('card.deleteAction')} onClick={onDelete} color="#ef4444" />
         </div>
       </div>
     </div>
@@ -438,6 +486,12 @@ function ScheduleCard({
 }
 
 // ─── Preset Picker Dialog ─────────────────────────────────
+
+const PRESET_ACCENTS = [
+  { iconBg: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', iconColor: '#09090b' },
+  { iconBg: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', iconColor: '#ffffff' },
+  { iconBg: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)', iconColor: '#ffffff' },
+]
 
 function PresetPicker({
   presets,
@@ -449,48 +503,225 @@ function PresetPicker({
   onClose: () => void
 }) {
   const { t } = useTranslation('schedules')
+  const panelRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    const dialog = panelRef.current
+    if (!dialog) return
+    const first = dialog.querySelector<HTMLElement>('button')
+    first?.focus()
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={onClose} />
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="preset-picker-title"
+    >
       <div
-        className="relative w-full max-w-md animate-scale-in rounded-2xl p-6"
-        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-medium)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        ref={panelRef}
+        className="relative max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl"
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 var(--glass-inset)',
+        }}
       >
-        <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-[16px] font-semibold text-white">{t('presets.dialogTitle')}</h3>
-          <button onClick={onClose} className="text-zinc-600 transition-colors hover:text-zinc-400">
-            <X className="h-5 w-5" strokeWidth={1.8} />
-          </button>
+        {/* Header */}
+        <div className="relative overflow-hidden px-7 pb-5 pt-7">
+          <div
+            className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full opacity-70"
+            style={{ background: 'radial-gradient(closest-side, rgba(245,158,11,0.16), transparent)' }}
+            aria-hidden="true"
+          />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  boxShadow: '0 6px 20px rgba(245,158,11,0.3)',
+                }}
+                aria-hidden="true"
+              >
+                <Sparkles className="h-5 w-5" style={{ color: 'var(--text-on-accent)' }} strokeWidth={2} />
+              </div>
+              <div>
+                <h3 id="preset-picker-title" className="text-[17px] font-semibold text-white">
+                  {t('presets.dialogTitle')}
+                </h3>
+                <p className="mt-0.5 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+                  {t('presets.dialogDescription')}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label={t('dialog.cancelButton')}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover-2)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <X className="h-4.5 w-4.5" strokeWidth={1.8} />
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-2.5">
-          {presets.map((preset) => (
-            <button
+        {/* Preset cards */}
+        <div className="grid grid-cols-1 gap-3 px-7 sm:grid-cols-2">
+          {presets.map((preset, i) => (
+            <PresetCard
               key={preset.label}
-              onClick={() => onSelect(preset.entry)}
-              className="w-full rounded-xl p-4 text-left transition-colors"
-              style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(245,158,11,0.3)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)' }}
-            >
-              <p className="text-[14px] font-medium text-zinc-200">{preset.label}</p>
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>{preset.description}</p>
-            </button>
+              preset={preset}
+              accent={PRESET_ACCENTS[i % PRESET_ACCENTS.length]}
+              recommended={!!preset.recommended}
+              onSelect={() => onSelect(preset.entry)}
+            />
           ))}
+        </div>
 
+        {/* Custom schedule */}
+        <div className="px-7 pb-7 pt-3">
           <button
             onClick={() => onSelect(null)}
-            className="w-full rounded-xl p-4 text-left transition-colors"
-            style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(245,158,11,0.3)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)' }}
+            className="group flex w-full items-center gap-3.5 rounded-2xl border border-dashed p-4 text-left transition-colors duration-150"
+            style={{ borderColor: 'var(--border-stronger)', background: 'var(--bg-subtle)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(245,158,11,0.5)'
+              e.currentTarget.style.background = 'var(--accent-muted-bg)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border-stronger)'
+              e.currentTarget.style.background = 'var(--bg-subtle)'
+            }}
           >
-            <p className="text-[14px] font-medium text-zinc-200">{t('presets.customLabel')}</p>
-            <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('presets.customDescription')}</p>
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: 'var(--bg-subtle-2)', border: '1px solid var(--border-medium)' }}
+            >
+              <SlidersHorizontal className="h-4.5 w-4.5" style={{ color: 'var(--text-secondary)' }} strokeWidth={1.8} aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-medium text-zinc-200">{t('presets.customLabel')}</p>
+              <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('presets.customDescription')}</p>
+            </div>
+            <ArrowRight
+              className="h-4.5 w-4.5 shrink-0"
+              style={{ color: 'var(--text-muted)' }}
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
           </button>
         </div>
       </div>
     </div>
+  )
+}
+
+function PresetCard({
+  preset,
+  accent,
+  recommended,
+  onSelect
+}: {
+  preset: Preset
+  accent: { iconBg: string; iconColor: string }
+  recommended: boolean
+  onSelect: () => void
+}) {
+  const { t } = useTranslation('schedules')
+  const Icon = preset.icon
+  const e = preset.entry
+  const taskCount = e.tasks?.length ?? 0
+  const time = `${String(e.hour ?? 9).padStart(2, '0')}:${String(e.minute ?? 0).padStart(2, '0')}`
+  const freq = frequencyLabel(e.frequency, t)
+  const scheduleLine =
+    e.frequency === 'daily'
+      ? `${freq} · ${time}`
+      : e.frequency === 'monthly'
+        ? `${freq} · ${ordinal(e.day ?? 1)} · ${time}`
+        : `${freq} · ${t(DAY_NAME_KEYS[e.day ?? 1] ?? 'dayNames.monday')} · ${time}`
+
+  return (
+    <button
+      onClick={onSelect}
+      className="group relative flex flex-col rounded-2xl p-5 text-left transition-colors duration-150"
+      style={{
+        background: recommended
+          ? 'linear-gradient(180deg, rgba(245,158,11,0.08) 0%, var(--bg-subtle) 100%)'
+          : 'linear-gradient(180deg, var(--bg-subtle-2) 0%, var(--bg-subtle) 100%)',
+        border: recommended ? '1px solid var(--accent-muted-border)' : '1px solid var(--border-medium)',
+        boxShadow: recommended
+          ? '0 0 32px rgba(245,158,11,0.08), inset 0 1px 0 rgba(255,255,255,0.04)'
+          : 'var(--glass-shadow)',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(245,158,11,0.35)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = recommended ? 'var(--accent-muted-border)' : 'var(--border-medium)' }}
+    >
+      {recommended && (
+        <div
+          className="absolute inset-x-5 top-0 h-0.5 rounded-t-2xl"
+          style={{ background: 'linear-gradient(90deg, transparent, #f59e0b, transparent)' }}
+          aria-hidden="true"
+        />
+      )}
+
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-xl"
+          style={{ background: accent.iconBg, boxShadow: '0 4px 14px rgba(0,0,0,0.2)' }}
+          aria-hidden="true"
+        >
+          <Icon className="h-5 w-5" style={{ color: accent.iconColor }} strokeWidth={2} />
+        </div>
+        <div className="flex items-center gap-2">
+          {recommended && (
+            <span
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
+              style={{ background: 'var(--accent-muted-bg)', color: 'var(--accent)', border: '1px solid var(--accent-muted-border)' }}
+            >
+              <Check className="h-3 w-3" strokeWidth={2.4} aria-hidden="true" />
+              {t('presets.recommendedBadge')}
+            </span>
+          )}
+          <ArrowRight className="h-4 w-4 shrink-0" style={{ color: 'var(--text-ghost-2)' }} strokeWidth={1.8} aria-hidden="true" />
+        </div>
+      </div>
+
+      <p className="mt-3.5 text-[15px] font-semibold text-zinc-100">{preset.label}</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        {preset.description}
+      </p>
+
+      <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3.5" style={{ borderColor: 'var(--border-subtle)' }}>
+        <span className="flex min-w-0 items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+          <Clock className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} strokeWidth={1.8} aria-hidden="true" />
+          <span className="truncate">{scheduleLine}</span>
+        </span>
+        <span
+          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+          style={{ background: 'var(--bg-subtle-2)', color: 'var(--text-muted)' }}
+        >
+          <ListChecks className="h-3 w-3" strokeWidth={1.8} aria-hidden="true" />
+          {taskCount}
+        </span>
+      </div>
+    </button>
   )
 }
 
@@ -499,17 +730,19 @@ function PresetPicker({
 function ScheduleDialog({
   initial,
   isEditing,
-  availableTasks,
+  existingNames,
   onSave,
   onClose
 }: {
   initial: Partial<ScheduleEntry>
   isEditing: boolean
-  availableTasks: TaskDef[]
+  existingNames: string[]
   onSave: (entry: ScheduleEntry) => void
   onClose: () => void
 }) {
   const { t } = useTranslation('schedules')
+  const { features } = usePlatform()
+  const allTasks = useAllTasks()
   const [name, setName] = useState(initial.name ?? '')
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>(initial.frequency ?? 'weekly')
   const [day, setDay] = useState(initial.day ?? 1)
@@ -517,6 +750,23 @@ function ScheduleDialog({
   const [minute, setMinute] = useState(initial.minute ?? 0)
   const [tasks, setTasks] = useState<ScheduleTaskType[]>(initial.tasks ?? [...CLEANER_TASKS])
   const [autoApply, setAutoApply] = useState(initial.autoApply ?? false)
+  const [touched, setTouched] = useState(false)
+
+  const panelRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  // Focus + ESC handling
+  useEffect(() => {
+    const dialog = panelRef.current
+    if (!dialog) return
+    dialog.querySelector<HTMLElement>('input, select, button')?.focus()
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const toggleTask = (type: ScheduleTaskType) => {
     setTasks((prev) =>
@@ -524,17 +774,25 @@ function ScheduleDialog({
     )
   }
 
-  const allAvailableTypes = availableTasks.map((t) => t.type)
-  const selectAll = () => setTasks([...allAvailableTypes])
+  const selectAll = () => setTasks([...availableTypes])
   const deselectAll = () => setTasks([])
 
-  const canSave = name.trim().length > 0 && tasks.length > 0
+  const trimmedName = name.trim()
+  const nameError = trimmedName.length === 0
+    ? t('dialog.nameRequired')
+    : existingNames.some((n) => n.toLowerCase() === trimmedName.toLowerCase())
+      ? t('dialog.nameDuplicate')
+      : null
+  const tasksError = tasks.length === 0 ? t('dialog.tasksRequired') : null
+  const showErrors = touched
+  const canSave = !nameError && !tasksError
 
   const handleSubmit = () => {
+    setTouched(true)
     if (!canSave) return
     const entry: ScheduleEntry = {
       id: (initial as ScheduleEntry).id ?? crypto.randomUUID(),
-      name: name.trim(),
+      name: trimmedName,
       enabled: (initial as ScheduleEntry).enabled ?? true,
       frequency,
       day,
@@ -549,192 +807,268 @@ function ScheduleDialog({
     onSave(entry)
   }
 
-  const selectStyle = "rounded-lg px-3 py-1.5 text-[13px] text-zinc-400 outline-none"
-  const selectBorder = { background: 'var(--bg-subtle-2)', border: '1px solid var(--border-medium)' }
+  const cleanerTasks = allTasks.filter((task) => task.group === 'cleaner')
+  const maintTasks = allTasks.filter((task) => task.group === 'maintenance')
+  const isAvailable = (task: TaskDef) => !task.requiresFeature || features[task.requiresFeature]
+  const availableTypes = allTasks.filter(isAvailable).map((task) => task.type)
+  const availableCount = availableTypes.length
+  const selectedAvailable = tasks.filter((type) => availableTypes.includes(type)).length
 
-  const cleanerTasks = availableTasks.filter((t) => t.group === 'cleaner')
-  const maintTasks = availableTasks.filter((t) => t.group === 'maintenance')
+  const inputErrorStyle = showErrors && nameError
+    ? { background: 'var(--bg-subtle)', border: '1px solid rgba(239,68,68,0.5)' }
+    : { background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)' }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={onClose} />
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="schedule-dialog-title"
+    >
       <div
-        className="relative max-h-[85vh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-2xl p-6"
-        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-medium)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        ref={panelRef}
+        className="relative max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl"
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 var(--glass-inset)',
+        }}
       >
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-[16px] font-semibold text-white">
-            {isEditing ? t('dialog.editTitle') : t('dialog.newTitle')}
-          </h3>
-          <button onClick={onClose} className="text-zinc-600 transition-colors hover:text-zinc-400">
-            <X className="h-5 w-5" strokeWidth={1.8} />
+        <div className="flex items-center justify-between p-6 pb-4">
+          <div>
+            <h3 id="schedule-dialog-title" className="text-[16px] font-semibold text-white">
+              {isEditing ? t('dialog.editTitle') : t('dialog.newTitle')}
+            </h3>
+            <p className="mt-1 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+              {formatFrequencyFrom(initial, frequency, day, hour, minute, t)}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label={t('dialog.cancelButton')}
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover-2)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <X className="h-4.5 w-4.5" strokeWidth={1.8} />
           </button>
         </div>
 
-        {/* Name */}
-        <div className="mb-5">
-          <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('dialog.nameLabel')}</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t('dialog.namePlaceholder')}
-            maxLength={60}
-            className="w-full rounded-xl px-4 py-2.5 text-[13px] text-zinc-300 outline-none placeholder:text-zinc-700"
-            style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)' }}
-          />
-        </div>
-
-        {/* Schedule timing */}
-        <div className="mb-5 grid grid-cols-3 gap-3">
+        <div className="space-y-5 px-6 pb-6">
+          {/* Name */}
           <div>
-            <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('dialog.frequencyLabel')}</label>
-            <select
-              value={frequency}
-              onChange={(e) => {
-                const f = e.target.value as 'daily' | 'weekly' | 'monthly'
-                setFrequency(f)
-                // Reset day to a sensible default for the new frequency
-                if (f === 'weekly') setDay(1) // Monday
-                if (f === 'monthly') setDay(1) // 1st
-              }}
-              className={cn(selectStyle, 'w-full')}
-              style={selectBorder}
+            <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+              {t('dialog.nameLabel')}
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('dialog.namePlaceholder')}
+              maxLength={60}
+              aria-invalid={showErrors && !!nameError}
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] outline-none transition-colors"
+              style={{ ...inputErrorStyle, color: 'var(--text-primary)' }}
+              onFocus={() => setTouched(true)}
+            />
+            {showErrors && nameError && (
+              <p
+                className="mt-1.5 flex items-center gap-1.5 text-[12px]"
+                style={{ color: '#ef4444' }}
+                role="alert"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                {nameError}
+              </p>
+            )}
+          </div>
+
+          {/* Frequency + day + time */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                {t('dialog.frequencyLabel')}
+              </label>
+              <div
+                className="flex items-center gap-1 rounded-xl p-1"
+                style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)' }}
+                role="group"
+                aria-label={t('dialog.frequencyLabel')}
+              >
+                {(['daily', 'weekly', 'monthly'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      setFrequency(f)
+                      if (f === 'weekly') setDay(1)
+                      if (f === 'monthly') setDay(1)
+                    }}
+                    className="flex-1 rounded-lg px-2 py-1.5 text-[12px] font-medium transition-all"
+                    style={
+                      frequency === f
+                        ? { background: 'var(--accent-muted-bg)', color: 'var(--accent)', border: '1px solid var(--accent-muted-border)' }
+                        : { background: 'transparent', color: 'var(--text-muted)', border: '1px solid transparent' }
+                    }
+                  >
+                    {t(`dialog.frequency${f[0].toUpperCase()}${f.slice(1)}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {(frequency === 'weekly' || frequency === 'monthly') && (
+              <div>
+                <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                  {t('dialog.dayLabel')}
+                </label>
+                <select
+                  value={day}
+                  onChange={(e) => setDay(Number(e.target.value))}
+                  className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-[13px] outline-none"
+                  style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                >
+                  {frequency === 'weekly' && DAY_NAME_KEYS.map((key, i) => (
+                    <option key={key} value={i} style={{ background: 'var(--card-bg)' }}>{t(key)}</option>
+                  ))}
+                  {frequency === 'monthly' && Array.from({ length: 31 }, (_, i) => (
+                    <option key={i + 1} value={i + 1} style={{ background: 'var(--card-bg)' }}>{ordinal(i + 1)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className={frequency === 'daily' ? 'sm:col-span-3' : ''}>
+              <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                {t('dialog.timeLabel')}
+              </label>
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={hour}
+                  onChange={(e) => setHour(Number(e.target.value))}
+                  aria-label={t('dialog.timeLabel')}
+                  className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-[13px] outline-none"
+                  style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i} style={{ background: 'var(--card-bg)' }}>{String(i).padStart(2, '0')}</option>
+                  ))}
+                </select>
+                <span className="text-[13px]" style={{ color: 'var(--text-muted)' }}>:</span>
+                <select
+                  value={minute}
+                  onChange={(e) => setMinute(Number(e.target.value))}
+                  aria-label={`${t('dialog.timeLabel')} (minutes)`}
+                  className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-[13px] outline-none"
+                  style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                >
+                  {Array.from({ length: 60 }, (_, i) => (
+                    <option key={i} value={i} style={{ background: 'var(--card-bg)' }}>{String(i).padStart(2, '0')}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Tasks */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <label className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                  {t('dialog.tasksLabel')}
+                </label>
+                <span className="ml-2 text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                  {selectedAvailable}/{availableCount}
+                </span>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={selectAll}
+                  className="text-[11px] font-medium transition-colors hover:brightness-125"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  {t('dialog.selectAll')}
+                </button>
+                <button
+                  onClick={deselectAll}
+                  className="text-[11px] font-medium transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {t('dialog.deselectAll')}
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="rounded-xl p-4"
+              style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}
             >
-              <option value="daily">{t('dialog.frequencyDaily')}</option>
-              <option value="weekly">{t('dialog.frequencyWeekly')}</option>
-              <option value="monthly">{t('dialog.frequencyMonthly')}</option>
-            </select>
+              <TaskGroup
+                title={t('dialog.cleanerGroup')}
+                tasks={cleanerTasks}
+                selected={tasks}
+                isAvailable={isAvailable}
+                unavailableLabel={t('dialog.notAvailableOnPlatform')}
+                onToggle={toggleTask}
+              />
+              <TaskGroup
+                title={t('dialog.maintenanceGroup')}
+                tasks={maintTasks}
+                selected={tasks}
+                isAvailable={isAvailable}
+                unavailableLabel={t('dialog.notAvailableOnPlatform')}
+                onToggle={toggleTask}
+                last
+              />
+            </div>
+
+            {showErrors && tasksError && (
+              <p
+                className="mt-1.5 flex items-center gap-1.5 text-[12px]"
+                style={{ color: '#ef4444' }}
+                role="alert"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                {tasksError}
+              </p>
+            )}
           </div>
 
-          {frequency === 'weekly' && (
-            <div>
-              <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('dialog.dayLabel')}</label>
-              <select
-                value={day}
-                onChange={(e) => setDay(Number(e.target.value))}
-                className={cn(selectStyle, 'w-full')}
-                style={selectBorder}
-              >
-                {DAY_NAME_KEYS.map((key, i) => <option key={i} value={i}>{t(key)}</option>)}
-              </select>
-            </div>
-          )}
-
-          {frequency === 'monthly' && (
-            <div>
-              <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('dialog.dayLabel')}</label>
-              <select
-                value={day}
-                onChange={(e) => setDay(Number(e.target.value))}
-                className={cn(selectStyle, 'w-full')}
-                style={selectBorder}
-              >
-                {Array.from({ length: 31 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>{ordinal(i + 1)}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div>
-            <label className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('dialog.timeLabel')}</label>
-            <div className="flex gap-1.5">
-              <select
-                value={hour}
-                onChange={(e) => setHour(Number(e.target.value))}
-                className={cn(selectStyle, 'w-full')}
-                style={selectBorder}
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-                ))}
-              </select>
-              <span className="flex items-center text-[13px] text-zinc-400">:</span>
-              <select
-                value={minute}
-                onChange={(e) => setMinute(Number(e.target.value))}
-                className={cn(selectStyle, 'w-full')}
-                style={selectBorder}
-              >
-                {Array.from({ length: 60 }, (_, i) => (
-                  <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Tasks */}
-        <div className="mb-5">
-          <div className="mb-2 flex items-center justify-between">
-            <label className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('dialog.tasksLabel')}</label>
-            <div className="flex gap-3">
-              <button onClick={selectAll} className="text-[11px] font-medium" style={{ color: 'var(--accent)' }}>{t('dialog.selectAll')}</button>
-              <button onClick={deselectAll} className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('dialog.deselectAll')}</button>
-            </div>
-          </div>
-
+          {/* Auto-apply */}
           <div
-            className="rounded-xl p-4"
+            className="flex items-start gap-4 rounded-xl p-4"
             style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}
           >
-            {/* Cleaner group */}
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{t('dialog.cleanerGroup')}</p>
-            <div className="mb-4 grid grid-cols-2 gap-1.5">
-              {cleanerTasks.map((task) => (
-                <TaskCheckbox
-                  key={task.type}
-                  task={task}
-                  checked={tasks.includes(task.type)}
-                  onChange={() => toggleTask(task.type)}
-                />
-              ))}
+            <div className="flex-1">
+              <p className="text-[13px] font-medium text-zinc-300">{t('dialog.autoApplyLabel')}</p>
+              <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                {t('dialog.autoApplyDescription')}
+              </p>
             </div>
+            <Toggle checked={autoApply} onChange={setAutoApply} label={t('dialog.autoApplyLabel')} />
+          </div>
 
-            {/* Maintenance group */}
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{t('dialog.maintenanceGroup')}</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {maintTasks.map((task) => (
-                <TaskCheckbox
-                  key={task.type}
-                  task={task}
-                  checked={tasks.includes(task.type)}
-                  onChange={() => toggleTask(task.type)}
-                />
-              ))}
+          {autoApply && (
+            <div
+              className="flex items-start gap-3 rounded-xl p-3"
+              style={{ background: 'var(--accent-muted-bg)', border: '1px solid var(--accent-muted-border)' }}
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} strokeWidth={1.8} aria-hidden="true" />
+              <p className="text-[12px] leading-relaxed" style={{ color: 'var(--accent)' }}>
+                {t('dialog.autoApplyWarning')}
+              </p>
             </div>
-          </div>
+          )}
         </div>
-
-        {/* Auto-apply */}
-        <div
-          className="mb-6 flex items-start gap-4 rounded-xl p-4"
-          style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}
-        >
-          <div className="flex-1">
-            <p className="text-[13px] font-medium text-zinc-300">{t('dialog.autoApplyLabel')}</p>
-            <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              {t('dialog.autoApplyDescription')}
-            </p>
-          </div>
-          <Toggle checked={autoApply} onChange={setAutoApply} />
-        </div>
-
-        {autoApply && (
-          <div
-            className="mb-6 flex items-start gap-3 rounded-xl p-3"
-            style={{ background: 'var(--accent-muted-bg)', border: '1px solid rgba(245,158,11,0.12)' }}
-          >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} strokeWidth={1.8} />
-            <p className="text-[12px] leading-relaxed" style={{ color: '#d97706' }}>
-              {t('dialog.autoApplyWarning')}
-            </p>
-          </div>
-        )}
 
         {/* Footer */}
-        <div className="flex justify-end gap-2.5">
+        <div className="flex items-center justify-end gap-2.5 border-t p-6 pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
           <button
             onClick={onClose}
             className="rounded-xl px-5 py-2.5 text-[13px] font-medium transition-colors"
@@ -748,11 +1082,16 @@ function ScheduleDialog({
             onClick={handleSubmit}
             disabled={!canSave}
             className={cn(
-              'rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-colors',
-              !canSave && 'cursor-not-allowed opacity-40'
+              'flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:brightness-110',
+              !canSave && 'cursor-not-allowed opacity-40 hover:brightness-100'
             )}
-            style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}
+            style={{
+              background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+              color: 'var(--text-on-accent)',
+              boxShadow: '0 0 16px rgba(245,158,11,0.2)',
+            }}
           >
+            <Check className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
             {isEditing ? t('dialog.saveChangesButton') : t('dialog.createScheduleButton')}
           </button>
         </div>
@@ -761,50 +1100,94 @@ function ScheduleDialog({
   )
 }
 
+function TaskGroup({
+  title,
+  tasks,
+  selected,
+  isAvailable,
+  unavailableLabel,
+  onToggle,
+  last
+}: {
+  title: string
+  tasks: TaskDef[]
+  selected: ScheduleTaskType[]
+  isAvailable: (task: TaskDef) => boolean
+  unavailableLabel: string
+  onToggle: (type: ScheduleTaskType) => void
+  last?: boolean
+}) {
+  if (tasks.length === 0) return null
+  return (
+    <div className={cn(!last && 'mb-4')}>
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{title}</p>
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        {tasks.map((task) => (
+          <TaskCheckbox
+            key={task.type}
+            task={task}
+            checked={selected.includes(task.type)}
+            available={isAvailable(task)}
+            unavailableLabel={unavailableLabel}
+            onChange={() => onToggle(task.type)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Small Components ─────────────────────────────────────
 
-function TaskCheckbox({ task, checked, onChange }: { task: TaskDef; checked: boolean; onChange: () => void }) {
+function TaskCheckbox({ task, checked, available, unavailableLabel, onChange }: { task: TaskDef; checked: boolean; available: boolean; unavailableLabel: string; onChange: () => void }) {
   return (
     <button
       onClick={onChange}
+      disabled={!available}
+      title={!available ? unavailableLabel : undefined}
+      aria-pressed={checked}
       className={cn(
-        'flex items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium transition-all',
-        checked ? 'text-zinc-200' : 'text-zinc-600'
+        'flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[12px] font-medium transition-all',
+        checked ? 'text-zinc-200' : available ? 'text-zinc-600' : 'text-zinc-600',
+        !available && 'cursor-not-allowed opacity-40'
       )}
       style={{
         background: checked ? 'var(--accent-muted-bg)' : 'transparent',
-        border: checked ? '1px solid var(--accent-muted-border)' : '1px solid transparent'
+        border: checked ? '1px solid var(--accent-muted-border)' : '1px solid transparent',
       }}
     >
       <div
         className="flex h-4 w-4 shrink-0 items-center justify-center rounded"
         style={{
           background: checked ? 'var(--accent)' : 'var(--bg-hover-2)',
-          border: checked ? 'none' : '1px solid var(--border-stronger)'
+          border: checked ? 'none' : '1px solid var(--border-stronger)',
         }}
       >
         {checked && (
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
             <path d="M2 5L4.2 7.5L8 2.5" stroke="var(--text-on-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
       </div>
-      <task.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
-      {task.label}
+      <task.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+      <span className="truncate">{task.label}</span>
     </button>
   )
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onChange(!checked) }}
-      className="relative h-[26px] w-[46px] shrink-0 rounded-full transition-colors"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className="relative h-[26px] w-[46px] shrink-0 cursor-pointer rounded-full transition-colors duration-200"
       style={{ background: checked ? 'var(--accent)' : 'var(--bg-active)' }}
     >
       <div
         className={cn(
-          'absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
+          'absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200',
           checked ? 'translate-x-[22px]' : 'translate-x-[3px]'
         )}
       />
@@ -817,27 +1200,44 @@ function IconBtn({ icon: Icon, title, onClick, color }: { icon: typeof Pencil; t
     <button
       onClick={(e) => { e.stopPropagation(); onClick() }}
       title={title}
-      className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+      aria-label={title}
+      className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 hover:scale-105"
       style={{ color: color ?? 'var(--text-muted)' }}
       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover-2)' }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
     >
-      <Icon className="h-4 w-4" strokeWidth={1.8} />
+      <Icon className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
     </button>
   )
 }
 
 // ─── Utilities ────────────────────────────────────────────
 
+function frequencyLabel(frequency: ScheduleEntry['frequency'] | undefined, t: (key: string) => string): string {
+  const f = frequency ?? 'weekly'
+  return t(`dialog.frequency${f[0].toUpperCase()}${f.slice(1)}`)
+}
+
 function formatFrequency(entry: ScheduleEntry, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  const time = `${String(entry.hour).padStart(2, '0')}:${String(entry.minute ?? 0).padStart(2, '0')}`
-  switch (entry.frequency) {
+  return formatFrequencyFrom(entry, entry.frequency, entry.day, entry.hour, entry.minute ?? 0, t)
+}
+
+function formatFrequencyFrom(
+  _entry: Partial<ScheduleEntry>,
+  frequency: 'daily' | 'weekly' | 'monthly',
+  day: number,
+  hour: number,
+  minute: number,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
+  const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+  switch (frequency) {
     case 'daily':
       return t('frequency.everyDayAt', { time })
     case 'weekly':
-      return t('frequency.everyWeekdayAt', { day: t(DAY_NAME_KEYS[entry.day] ?? 'dayNames.monday'), time })
+      return t('frequency.everyWeekdayAt', { day: t(DAY_NAME_KEYS[day] ?? 'dayNames.monday'), time })
     case 'monthly':
-      return t('frequency.monthlyAt', { ordinalDay: ordinal(entry.day), time })
+      return t('frequency.monthlyAt', { ordinalDay: ordinal(day), time })
   }
 }
 

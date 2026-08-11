@@ -117,6 +117,42 @@ function getExeNames(program: InstalledProgram): string[] {
 }
 
 /**
+ * Rank an install path so we can prefer the "real" install location when a
+ * system inventory lists the same app from multiple places (e.g. macOS
+ * system_profiler reports both a staging copy under ~/Library/Application
+ * Support and the real bundle in /Applications). Lower rank wins; 99 = none.
+ */
+function installPathRank(path: string): number {
+  if (!path) return 99
+  const p = path.replace(/\\/g, '/').toLowerCase()
+  // Transient/staging locations — never the canonical install
+  if (
+    /(^|\/)\.trash(\/|$)/.test(p) ||
+    p.includes('in_progress') ||
+    /(^|\/)(private\/)?tmp(\/|$)/.test(p) ||
+    p.includes('/var/folders/') ||
+    p.includes('com.apple.dt') ||
+    p.includes('cocoapods') ||
+    p.includes('/sdk/') ||
+    p.includes('node_modules')
+  ) {
+    return 3
+  }
+  if (/^\/applications(\/|$)/.test(p)) return 0
+  if (p.includes('/applications/')) return 1 // e.g. /Volumes/X/Applications, ~/Applications
+  if (/^\/system(\/|$)/.test(p)) return 2
+  return 2
+}
+
+/** Prefer the candidate when it is a "better" entry than the current one. */
+function isBetterInstall(candidate: InstalledProgram, current: InstalledProgram): boolean {
+  const candidateRank = installPathRank(candidate.installLocation)
+  const currentRank = installPathRank(current.installLocation)
+  if (candidateRank !== currentRank) return candidateRank < currentRank
+  return candidate.estimatedSize > current.estimatedSize
+}
+
+/**
  * Query the Windows Registry for all installed programs with full details.
  */
 export async function getInstalledProgramsFull(): Promise<InstalledProgram[]> {
@@ -124,14 +160,14 @@ export async function getInstalledProgramsFull(): Promise<InstalledProgram[]> {
   if (process.platform !== 'win32') {
     const platform = getPlatform()
     const apps = await platform.commands.getInstalledApps()
-    return apps.map((app) => ({
+    const mapApp = (app: { name: string; publisher: string; version: string; installDate: string; sizeKb: number; path?: string }): InstalledProgram => ({
       id: createHash('sha256').update(`${app.name}::${app.publisher}`).digest('hex').substring(0, 16),
       displayName: app.name,
       publisher: app.publisher,
       displayVersion: app.version,
       installDate: app.installDate || '',
       estimatedSize: (app.sizeKb || 0) * 1024,
-      installLocation: '',
+      installLocation: app.path || '',
       uninstallString: '',
       quietUninstallString: '',
       displayIcon: '',
@@ -139,7 +175,23 @@ export async function getInstalledProgramsFull(): Promise<InstalledProgram[]> {
       isSystemComponent: false,
       isWindowsInstaller: false,
       lastUsed: -1,
-    })).sort((a, b) => a.displayName.localeCompare(b.displayName))
+    })
+
+    // Inventory tools (system_profiler, etc.) can report the same app from
+    // multiple locations — e.g. a staging copy under ~/Library while the real
+    // bundle sits in /Applications. Deduplicate by name+publisher and keep the
+    // entry with the most canonical install path.
+    const byKey = new Map<string, InstalledProgram>()
+    for (const app of apps) {
+      const program = mapApp(app)
+      const key = `${program.displayName.toLowerCase()}|${program.publisher.toLowerCase()}`
+      const existing = byKey.get(key)
+      if (!existing || isBetterInstall(program, existing)) {
+        byKey.set(key, program)
+      }
+    }
+
+    return [...byKey.values()].sort((a, b) => a.displayName.localeCompare(b.displayName))
   }
 
   const programs: InstalledProgram[] = []

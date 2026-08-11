@@ -1,57 +1,74 @@
 import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { formatSpeed } from '@/lib/utils'
 import type { PerfSnapshot } from '@shared/types'
 
 interface TimeSeriesChartProps {
   history: PerfSnapshot[]
-  timeRange: '60s' | '5m' | '15m'
-  dataKey: 'cpu' | 'memory' | 'disk'
+  dataKey: 'cpu' | 'memory' | 'disk' | 'network'
   label: string
   color: string
+  /** Secondary line color (write / upload). Only used for disk & network. */
+  accentColor?: string
 }
-
-const rangeSeconds = { '60s': 60, '5m': 300, '15m': 900 }
 
 // Cap the number of data points rendered to avoid Recharts SVG thrashing
 const MAX_CHART_POINTS = 120
 
-export const TimeSeriesChart = memo(function TimeSeriesChart({ history, timeRange, dataKey, label, color }: TimeSeriesChartProps) {
+export const TimeSeriesChart = memo(function TimeSeriesChart({ history, dataKey, label, color, accentColor = '#ef4444' }: TimeSeriesChartProps) {
   const { t } = useTranslation('performance')
+
   const data = useMemo(() => {
-    const count = rangeSeconds[timeRange]
-    const slice = history.slice(-count)
-
-    // Downsample if there are too many points
-    const step = slice.length > MAX_CHART_POINTS ? Math.ceil(slice.length / MAX_CHART_POINTS) : 1
-
+    const step = history.length > MAX_CHART_POINTS ? Math.ceil(history.length / MAX_CHART_POINTS) : 1
     const result: Array<Record<string, number>> = []
-    for (let i = 0; i < slice.length; i += step) {
-      const s = slice[i]
+    for (let i = 0; i < history.length; i += step) {
+      const s = history[i]
       if (dataKey === 'cpu') {
         result.push({ t: result.length, value: s.cpu.overall })
       } else if (dataKey === 'memory') {
         result.push({ t: result.length, value: s.memory.percent })
-      } else {
+      } else if (dataKey === 'disk') {
         result.push({
           t: result.length,
           read: s.disk.readBytesPerSec / (1024 * 1024),
           write: s.disk.writeBytesPerSec / (1024 * 1024)
         })
+      } else {
+        result.push({
+          t: result.length,
+          read: s.network.rxBytesPerSec / (1024 * 1024),
+          write: s.network.txBytesPerSec / (1024 * 1024)
+        })
       }
     }
     return result
-  }, [history, timeRange, dataKey])
+  }, [history, dataKey])
 
-  const isDisk = dataKey === 'disk'
+  const dual = dataKey === 'disk' || dataKey === 'network'
+  const last = history[history.length - 1]
   const gradientId = `gradient-${dataKey}`
+  const accentGradientId = `gradient-${dataKey}-accent`
+
+  const currentLabel = useMemo(() => {
+    if (!last) return '--'
+    if (dataKey === 'cpu') return `${last.cpu.overall.toFixed(1)}${t('chartPercentUnit')}`
+    if (dataKey === 'memory') return `${last.memory.percent.toFixed(1)}${t('chartPercentUnit')}`
+    const r = dataKey === 'disk' ? last.disk.readBytesPerSec : last.network.rxBytesPerSec
+    const w = dataKey === 'disk' ? last.disk.writeBytesPerSec : last.network.txBytesPerSec
+    return `↓ ${formatSpeed(r)}  ↑ ${formatSpeed(w)}`
+  }, [last, dataKey, t])
 
   return (
     <div
-      className="rounded-2xl p-5"
-      style={{ background: 'var(--card-bg)', border: '1px solid var(--border-default)' }}
+      className="glass-card flex flex-col rounded-2xl p-4"
     >
-      <div className="mb-3 text-[12px] font-semibold text-zinc-400">{label}</div>
+      <div className="mb-3 flex items-baseline justify-between">
+        <span className="text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+        <span className="text-[12px] font-bold font-mono" style={{ color: 'var(--text-primary)' }}>
+          {currentLabel}
+        </span>
+      </div>
       <ResponsiveContainer width="100%" height={140}>
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>
@@ -59,21 +76,18 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({ history, timeRang
               <stop offset="0%" stopColor={color} stopOpacity={0.25} />
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
-            {isDisk && (
-              <linearGradient id="gradient-disk-write" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+            {dual && (
+              <linearGradient id={accentGradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={accentColor} stopOpacity={0.25} />
+                <stop offset="100%" stopColor={accentColor} stopOpacity={0} />
               </linearGradient>
             )}
           </defs>
           <XAxis dataKey="t" hide />
-          <YAxis
-            hide
-            domain={isDisk ? ['auto', 'auto'] : [0, 100]}
-          />
+          <YAxis hide domain={dual ? ['auto', 'auto'] : [0, 100]} />
           <Tooltip
             contentStyle={{
-              background: '#1e1e24',
+              background: 'var(--bg-overlay)',
               border: '1px solid var(--border-strong)',
               borderRadius: '10px',
               fontSize: '12px',
@@ -81,10 +95,12 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({ history, timeRang
             }}
             labelFormatter={() => ''}
             formatter={(val) =>
-              isDisk ? [`${Number(val).toFixed(1)} ${t('chartDiskUnit')}`] : [`${Number(val).toFixed(1)}${t('chartPercentUnit')}`]
+              dual
+                ? [`${Number(val).toFixed(1)} ${t('chartDiskUnit')}`]
+                : [`${Number(val).toFixed(1)}${t('chartPercentUnit')}`]
             }
           />
-          {isDisk ? (
+          {dual ? (
             <>
               <Area
                 type="monotone"
@@ -93,16 +109,16 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({ history, timeRang
                 fill={`url(#${gradientId})`}
                 strokeWidth={1.5}
                 isAnimationActive={false}
-                name={t('chartDiskReadName')}
+                name={dataKey === 'disk' ? t('chartDiskReadName') : t('chartNetworkRx')}
               />
               <Area
                 type="monotone"
                 dataKey="write"
-                stroke="#ef4444"
-                fill="url(#gradient-disk-write)"
+                stroke={accentColor}
+                fill={`url(#${accentGradientId})`}
                 strokeWidth={1.5}
                 isAnimationActive={false}
-                name={t('chartDiskWriteName')}
+                name={dataKey === 'disk' ? t('chartDiskWriteName') : t('chartNetworkTx')}
               />
             </>
           ) : (

@@ -23,7 +23,8 @@
     "noTasksSelected": "Nie wybrano zadań",
     "nextRun": "Następne: {{time}}",
     "lastRun": "Ostatnie: {{time}}",
-    "neverRun": "Nigdy nie uruchomiono"
+    "neverRun": "Nigdy nie uruchomiono",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Wybierz szablon",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Comiesięczna gruntowna konserwacja",
     "monthlyDeepMaintenanceDescription": "Pełne czyszczenie + rejestr, sterowniki i oprogramowanie 1. dnia miesiąca o 10:00",
     "customLabel": "Niestandardowy",
-    "customDescription": "Rozpocznij od zera z pustym harmonogramem"
+    "customDescription": "Rozpocznij od zera z pustym harmonogramem",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Edytuj harmonogram",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Działania będą uruchamiane automatycznie zgodnie z harmonogramem. Upewnij się, że lista wykluczeń jest aktualna.",
     "cancelButton": "Anuluj",
     "saveChangesButton": "Zapisz zmiany",
-    "createScheduleButton": "Utwórz harmonogram"
+    "createScheduleButton": "Utwórz harmonogram",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "System",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} godz. temu",
     "daysAgo": "{{count}} dni temu"
   },
-  "copyNameSuffix": "(kopia)"
+  "copyNameSuffix": "(kopia)",
+  "runNowStarted": "Started \"{{name}}\""
 }

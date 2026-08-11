@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { GameModeSnapshot } from '../../shared/types'
 
 // ── Mocks ──
 // game-mode.ipc pulls in electron, child_process and a handful of services.
@@ -163,7 +164,7 @@ function validateSnapshot(raw: unknown): boolean {
 
 // ── Valid snapshot fixture ──
 
-function validSnapshot() {
+function validSnapshot(): GameModeSnapshot {
   return {
     activatedAt: '2025-06-15T10:30:00.000Z',
     active: true,

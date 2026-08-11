@@ -75,7 +75,7 @@ export function createWin32Commands(): PlatformCommands {
           `foreach ($p in $paths) { ` +
           `  $apps += Get-ItemProperty $p -ErrorAction SilentlyContinue | ` +
           `  Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' } | ` +
-          `  Select-Object DisplayName,DisplayVersion,Publisher,InstallDate,EstimatedSize } ` +
+          `  Select-Object DisplayName,DisplayVersion,Publisher,InstallDate,EstimatedSize,InstallLocation } ` +
           `$apps | Sort-Object DisplayName -Unique | ConvertTo-Json -Compress`
         ),
       ], { timeout: 30_000, windowsHide: true })
@@ -83,7 +83,7 @@ export function createWin32Commands(): PlatformCommands {
       const trimmed = stdout.trim()
       if (!trimmed) return []
       const raw = JSON.parse(trimmed)
-      const apps: Array<{ DisplayName: string; DisplayVersion: string; Publisher: string; InstallDate: string; EstimatedSize: number }> =
+      const apps: Array<{ DisplayName: string; DisplayVersion: string; Publisher: string; InstallDate: string; EstimatedSize: number; InstallLocation: string }> =
         Array.isArray(raw) ? raw : [raw]
 
       return apps.map((a) => ({
@@ -92,6 +92,7 @@ export function createWin32Commands(): PlatformCommands {
         publisher: a.Publisher ?? '',
         installDate: a.InstallDate ?? '',
         sizeKb: a.EstimatedSize ?? 0,
+        path: a.InstallLocation ?? '',
       }))
     },
 

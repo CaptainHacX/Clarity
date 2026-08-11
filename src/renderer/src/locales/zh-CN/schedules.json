@@ -23,7 +23,8 @@
     "noTasksSelected": "未选择任务",
     "nextRun": "下次：{{time}}",
     "lastRun": "上次：{{time}}",
-    "neverRun": "从未运行"
+    "neverRun": "从未运行",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "选择模板",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "每月深度维护",
     "monthlyDeepMaintenanceDescription": "每月 1 日上午 10:00 执行完整清理 + 注册表、驱动程序和软件维护",
     "customLabel": "自定义",
-    "customDescription": "从空白计划任务开始创建"
+    "customDescription": "从空白计划任务开始创建",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "编辑计划任务",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "操作将按计划自动执行。请确保您的排除列表已保持最新。",
     "cancelButton": "取消",
     "saveChangesButton": "保存更改",
-    "createScheduleButton": "创建计划任务"
+    "createScheduleButton": "创建计划任务",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "系统",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} 小时前",
     "daysAgo": "{{count}} 天前"
   },
-  "copyNameSuffix": "（副本）"
+  "copyNameSuffix": "（副本）",
+  "runNowStarted": "Started \"{{name}}\""
 }

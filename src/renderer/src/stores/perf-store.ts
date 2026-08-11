@@ -1,8 +1,11 @@
 import { create } from 'zustand'
-import type { PerfSystemInfo, PerfSnapshot, PerfProcess, DiskSmartInfo, HardwareHealthSnapshot } from '@shared/types'
+import type { PerfSystemInfo, PerfSnapshot, PerfProcess, DiskSmartInfo, DiskVolumeUsage, HardwareHealthSnapshot } from '@shared/types'
 
 const MAX_HISTORY = 900 // 15 minutes at 1s intervals
 const CHART_THROTTLE_MS = 2000 // Only update chart-facing history every 2s
+
+export const REFRESH_INTERVAL_OPTIONS_MS = [5000, 60_000, 300_000, 900_000] as const
+export const DEFAULT_REFRESH_INTERVAL_MS = 5000
 
 interface PerfState {
   systemInfo: PerfSystemInfo | null
@@ -19,10 +22,16 @@ interface PerfState {
   _lastHistoryFlush: number
   processList: PerfProcess[]
   processCount: number
+  diskVolumes: DiskVolumeUsage[]
   isMonitoring: boolean
-  timeRange: '60s' | '5m' | '15m'
+  /** Data collection cadence in ms. 0 means paused. */
+  refreshIntervalMs: number
+  /** Epoch ms of the most recent data push from the main process. */
+  lastUpdated: number | null
+  /** True while a manual "Refresh Now" is in flight. */
+  isRefreshing: boolean
   processFilter: string
-  processSortColumn: 'cpuPercent' | 'memBytes' | 'name' | 'pid'
+  processSortColumn: 'cpuPercent' | 'memBytes' | 'memPercent' | 'name' | 'pid' | 'user'
   processSortDir: 'asc' | 'desc'
   diskHealth: DiskSmartInfo[]
   hardwareHealth: HardwareHealthSnapshot | null
@@ -30,8 +39,10 @@ interface PerfState {
   setSystemInfo: (info: PerfSystemInfo) => void
   pushSnapshot: (snap: PerfSnapshot) => void
   setProcessList: (processes: PerfProcess[], totalCount: number) => void
+  setDiskVolumes: (volumes: DiskVolumeUsage[]) => void
   setMonitoring: (on: boolean) => void
-  setTimeRange: (range: '60s' | '5m' | '15m') => void
+  setRefreshInterval: (ms: number) => void
+  setRefreshing: (refreshing: boolean) => void
   setProcessFilter: (filter: string) => void
   setProcessSort: (column: PerfState['processSortColumn']) => void
   setDiskHealth: (disks: DiskSmartInfo[]) => void
@@ -61,8 +72,11 @@ export const usePerfStore = create<PerfState>((set, get) => ({
   _lastHistoryFlush: 0,
   processList: [],
   processCount: 0,
+  diskVolumes: [],
   isMonitoring: false,
-  timeRange: '60s',
+  refreshIntervalMs: DEFAULT_REFRESH_INTERVAL_MS,
+  lastUpdated: null,
+  isRefreshing: false,
   processFilter: '',
   processSortColumn: 'cpuPercent',
   processSortDir: 'desc',
@@ -85,6 +99,7 @@ export const usePerfStore = create<PerfState>((set, get) => ({
     if (shouldFlush) {
       set({
         currentSnapshot: snap,
+        lastUpdated: now,
         _ringWriteIndex: nextIdx,
         _ringSize: nextSize,
         history: ringToArray(buf, nextIdx, nextSize),
@@ -93,6 +108,7 @@ export const usePerfStore = create<PerfState>((set, get) => ({
     } else {
       set({
         currentSnapshot: snap,
+        lastUpdated: now,
         _ringWriteIndex: nextIdx,
         _ringSize: nextSize
       })
@@ -102,9 +118,13 @@ export const usePerfStore = create<PerfState>((set, get) => ({
   setProcessList: (processes, totalCount) =>
     set({ processList: processes, processCount: totalCount }),
 
+  setDiskVolumes: (volumes) => set({ diskVolumes: volumes }),
+
   setMonitoring: (on) => set({ isMonitoring: on }),
 
-  setTimeRange: (range) => set({ timeRange: range }),
+  setRefreshInterval: (ms) => set({ refreshIntervalMs: ms }),
+
+  setRefreshing: (refreshing) => set({ isRefreshing: refreshing }),
 
   setProcessFilter: (filter) => set({ processFilter: filter }),
 
@@ -131,7 +151,11 @@ export const usePerfStore = create<PerfState>((set, get) => ({
       _lastHistoryFlush: 0,
       processList: [],
       processCount: 0,
+      diskVolumes: [],
       isMonitoring: false,
+      refreshIntervalMs: DEFAULT_REFRESH_INTERVAL_MS,
+      lastUpdated: null,
+      isRefreshing: false,
       processFilter: '',
       diskHealth: [],
       hardwareHealth: null

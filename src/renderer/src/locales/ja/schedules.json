@@ -23,7 +23,8 @@
     "noTasksSelected": "タスクが選択されていません",
     "nextRun": "次回: {{time}}",
     "lastRun": "前回: {{time}}",
-    "neverRun": "未実行"
+    "neverRun": "未実行",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "テンプレートを選択",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "毎月の詳細メンテナンス",
     "monthlyDeepMaintenanceDescription": "毎月1日の午前10時に、フルクリーン + レジストリ、ドライバー、ソフトウェアを実行",
     "customLabel": "カスタム",
-    "customDescription": "空のスケジュールから作成を開始"
+    "customDescription": "空のスケジュールから作成を開始",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "スケジュールを編集",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "操作はスケジュールに従って自動的に実行されます。除外リストが最新であることを確認してください。",
     "cancelButton": "キャンセル",
     "saveChangesButton": "変更を保存",
-    "createScheduleButton": "スケジュールを作成"
+    "createScheduleButton": "スケジュールを作成",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "システム",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}}時間前",
     "daysAgo": "{{count}}日前"
   },
-  "copyNameSuffix": "（コピー）"
+  "copyNameSuffix": "（コピー）",
+  "runNowStarted": "Started \"{{name}}\""
 }

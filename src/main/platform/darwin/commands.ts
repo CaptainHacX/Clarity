@@ -141,6 +141,7 @@ export function createDarwinCommands(): PlatformCommands {
           publisher: a.obtained_from ?? '',
           installDate: a.lastModified ?? '',
           sizeKb: a.path ? (sizeMap.get(a.path) ?? 0) : 0,
+          path: a.path ?? '',
         }))
       } catch {
         return []

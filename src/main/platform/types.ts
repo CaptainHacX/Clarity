@@ -166,6 +166,8 @@ export interface InstalledApp {
   publisher: string
   installDate: string
   sizeKb: number
+  /** Install location on disk (e.g. /Applications/Slack.app). Empty when unknown. */
+  path?: string
 }
 
 export interface OsUpdateInfo {

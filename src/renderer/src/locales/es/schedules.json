@@ -23,7 +23,8 @@
     "noTasksSelected": "No hay tareas seleccionadas",
     "nextRun": "Siguiente: {{time}}",
     "lastRun": "Última: {{time}}",
-    "neverRun": "Nunca se ejecutó"
+    "neverRun": "Nunca se ejecutó",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Elegir una plantilla",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Mantenimiento profundo mensual",
     "monthlyDeepMaintenanceDescription": "Limpieza completa + registro, controladores y software el día 1 a las 10:00",
     "customLabel": "Personalizada",
-    "customDescription": "Comience desde cero con una programación en blanco"
+    "customDescription": "Comience desde cero con una programación en blanco",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Editar programación",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Las acciones se ejecutarán automáticamente según la programación. Asegúrese de que su lista de exclusiones esté actualizada.",
     "cancelButton": "Cancelar",
     "saveChangesButton": "Guardar cambios",
-    "createScheduleButton": "Crear programación"
+    "createScheduleButton": "Crear programación",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Sistema",
@@ -96,5 +104,6 @@
     "hoursAgo": "Hace {{count}} h",
     "daysAgo": "Hace {{count}} d"
   },
-  "copyNameSuffix": "(copia)"
+  "copyNameSuffix": "(copia)",
+  "runNowStarted": "Started \"{{name}}\""
 }

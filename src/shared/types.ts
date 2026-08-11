@@ -483,6 +483,12 @@ export interface PerfSystemInfo {
   cpuThreads: number
   totalMemBytes: number
   osVersion: string
+  /** Node platform identifier, e.g. "win32" | "darwin" | "linux". */
+  platform: string
+  /** OS kernel version, e.g. "23.5.0" or "10.0.26100". null when it can't be read. */
+  kernel: string | null
+  /** CPU architecture, e.g. "arm64" or "x64". null when it can't be read. */
+  arch: string | null
   hostname: string
 }
 
@@ -498,9 +504,22 @@ export interface PerfSnapshot {
   timestamp: number
   cpu: { overall: number; perCore: number[] }
   memory: { usedBytes: number; totalBytes: number; cachedBytes: number; percent: number }
+  swap: { usedBytes: number; totalBytes: number; percent: number }
   disk: { readBytesPerSec: number; writeBytesPerSec: number }
   network: { rxBytesPerSec: number; txBytesPerSec: number }
   uptime: number
+}
+
+/** Per-volume disk usage, polled on a slow cadence (filesystem sizes are expensive). */
+export interface DiskVolumeUsage {
+  mount: string
+  name: string
+  fsType: string
+  totalBytes: number
+  usedBytes: number
+  freeBytes: number
+  /** 0-100 used percentage. null when totals can't be determined. */
+  percent: number | null
 }
 
 export interface PerfProcess {
@@ -536,8 +555,15 @@ export interface HardwareHealthSnapshot {
   timestamp: number
   /** CPU temperature in °C. null when the platform exposes no sensor. */
   cpuTemperature: number | null
-  /** Per-GPU temperatures in °C (may be empty or null where unsupported). */
-  gpuTemperatures: Array<{ name: string; temperature: number | null }>
+  /** Per-GPU info (temperature, load, VRAM). Empty where unsupported. */
+  gpus: Array<{
+    name: string
+    temperature: number | null
+    /** GPU utilization 0-100. null when the driver doesn't report it. */
+    loadPercent: number | null
+    /** Total VRAM in bytes. null when unknown. */
+    vramBytes: number | null
+  }>
   /** null on desktops with no battery present. */
   battery: {
     present: boolean
@@ -1145,7 +1171,7 @@ export type FirewallIssue = 'stale' | 'unsigned' | 'broad-scope' | 'any-remote'
 export type FirewallRiskLevel = 'high' | 'medium' | 'low'
 
 export interface FirewallRule {
-  // Internal name (used as -Name when disabling/removing). Unique per rule.
+  // Internal name (used as -Name when disabling/re-enabling/removing). Unique per rule.
   name: string
   displayName: string
   description: string
@@ -1196,7 +1222,7 @@ export interface FirewallScanProgress {
   currentRule: string
 }
 
-export type FirewallAction = 'disable' | 'delete'
+export type FirewallAction = 'disable' | 'enable' | 'delete'
 
 // ─── Software Updater ──────────────────────────────────────
 export type UpdateSeverity = 'major' | 'minor' | 'patch' | 'unknown'
@@ -1401,6 +1427,9 @@ export interface ThreatBlacklist {
 
 export type CveSeverity = 'critical' | 'high' | 'medium' | 'low' | 'none'
 
+/** Client-managed remediation status for a detected vulnerability. */
+export type CveStatus = 'open' | 'in-progress' | 'risk-accepted' | 'resolved' | 'ignored'
+
 export interface CveVulnerability {
   id: number
   cveId: string
@@ -1420,6 +1449,19 @@ export interface CveSummary {
   high: number
   medium: number
   low: number
+  /** Vulnerabilities with a known fix (fixedIn) available */
+  patched: number
+}
+
+/** One day bucket in the vulnerability trend series. */
+export interface CveTrendPoint {
+  /** ISO date (local day, midnight) */
+  date: string
+  /** Short human label, e.g. "Aug 3" */
+  label: string
+  new: number
+  resolved: number
+  remaining: number
 }
 
 export interface CvePageResult {
@@ -1429,6 +1471,10 @@ export interface CvePageResult {
   nextPageUrl: string | null
   /** Total CVE entries tracked in the server database */
   librarySize: number
+  /** Distinct affected component names across the full dataset (unfiltered), for filter dropdowns */
+  components: string[]
+  /** Daily new/resolved/remaining buckets (90 days, oldest → newest) */
+  trend: CveTrendPoint[]
 }
 
 // ─── Large File Finder ────────────────────────────────────

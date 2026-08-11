@@ -23,7 +23,8 @@
     "noTasksSelected": "선택된 작업 없음",
     "nextRun": "다음: {{time}}",
     "lastRun": "마지막: {{time}}",
-    "neverRun": "실행한 적 없음"
+    "neverRun": "실행한 적 없음",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "템플릿 선택",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "월간 심층 유지 관리",
     "monthlyDeepMaintenanceDescription": "매월 1일 오전 10시에 전체 정리 + 레지스트리, 드라이버 및 소프트웨어",
     "customLabel": "사용자 지정",
-    "customDescription": "빈 일정으로 처음부터 시작"
+    "customDescription": "빈 일정으로 처음부터 시작",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "일정 편집",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "작업이 일정에 따라 자동으로 실행됩니다. 제외 목록이 최신 상태인지 확인하세요.",
     "cancelButton": "취소",
     "saveChangesButton": "변경 사항 저장",
-    "createScheduleButton": "일정 만들기"
+    "createScheduleButton": "일정 만들기",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "시스템",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}}시간 전",
     "daysAgo": "{{count}}일 전"
   },
-  "copyNameSuffix": "(복사본)"
+  "copyNameSuffix": "(복사본)",
+  "runNowStarted": "Started \"{{name}}\""
 }

@@ -187,6 +187,17 @@ function triggerScheduleEntry(mainWindow: BrowserWindow | null, entry: ScheduleE
 }
 
 /**
+ * Trigger a schedule entry immediately (Run Now).
+ * Looks up the entry by id and reuses the same in-flight-guarded trigger path.
+ */
+export function runScheduleNow(scheduleId: string, getMainWindow: () => BrowserWindow | null): boolean {
+  const entry = getSettings().schedules.find((s) => s.id === scheduleId)
+  if (!entry) return false
+  triggerScheduleEntry(getMainWindow(), entry)
+  return true
+}
+
+/**
  * Send a notification when a scheduled scan completes.
  */
 export function notifyScheduledScanComplete(totalSize: number, itemCount: number): void {

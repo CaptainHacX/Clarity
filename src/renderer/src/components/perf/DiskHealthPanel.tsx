@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { HardDrive, Thermometer, AlertTriangle, CheckCircle, XCircle, HelpCircle, ShieldAlert } from 'lucide-react'
 import type { DiskSmartInfo } from '@shared/types'
 import { formatBytes } from '@/lib/utils'
+import { CapabilityBadge, type CapabilityState } from './CapabilityBadge'
 
 interface DiskHealthPanelProps {
   disks: DiskSmartInfo[]
@@ -11,7 +12,7 @@ const statusConfig = {
   Healthy: { icon: CheckCircle, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
   Caution: { icon: AlertTriangle, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
   Bad: { icon: XCircle, color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
-  Unknown: { icon: HelpCircle, color: 'var(--text-muted)', bg: 'rgba(110,110,118,0.1)' }
+  Unknown: { icon: HelpCircle, color: 'var(--text-muted)', bg: 'var(--bg-subtle)' }
 }
 
 const statusI18nKeys = {
@@ -27,10 +28,7 @@ function DiskCard({ disk }: { disk: DiskSmartInfo }) {
   const StatusIcon = status.icon
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-2xl p-5"
-      style={{ background: 'var(--card-bg)', border: '1px solid var(--border-default)' }}
-    >
+    <div className="glass-card flex flex-col gap-3 rounded-2xl p-5">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
@@ -38,10 +36,10 @@ function DiskCard({ disk }: { disk: DiskSmartInfo }) {
             className="flex h-9 w-9 items-center justify-center rounded-xl"
             style={{ background: 'var(--bg-subtle-2)' }}
           >
-            <HardDrive className="h-4 w-4 text-zinc-400" />
+            <HardDrive className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
           </div>
-          <div>
-            <div className="text-[13px] font-semibold text-white">{disk.model}</div>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{disk.model}</div>
             <div className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
               {disk.type} &middot; {formatBytes(disk.sizeBytes, 0)}
             </div>
@@ -50,7 +48,7 @@ function DiskCard({ disk }: { disk: DiskSmartInfo }) {
 
         {/* Status badge */}
         <div
-          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1"
           style={{ background: status.bg }}
         >
           <StatusIcon className="h-3.5 w-3.5" style={{ color: status.color }} />
@@ -151,21 +149,25 @@ export function DiskHealthPanel({ disks }: DiskHealthPanelProps) {
   const hasDetailedData = disks.some(
     (d) => d.temperature !== null || d.powerOnHours !== null || d.remainingLife !== null
   )
+  const capability: CapabilityState = hasDetailedData ? 'supported' : 'permission-required'
 
   return (
     <div className="mb-6">
       <div className="mb-3 flex items-center gap-2">
-        <h3 className="text-[13px] font-semibold text-zinc-400">{t('diskHealthTitle')}</h3>
+        <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+          {t('diskHealthTitle')}
+        </h3>
+        <CapabilityBadge state={capability} />
         {!hasDetailedData && (
-          <div className="flex items-center gap-1 rounded-md px-2 py-0.5" style={{ background: 'var(--accent-muted-bg)' }}>
-            <ShieldAlert className="h-3 w-3" style={{ color: '#92700c' }} />
-            <span className="text-[10px] font-medium" style={{ color: '#92700c' }}>
+          <div className="flex items-center gap-1">
+            <ShieldAlert className="h-3 w-3" style={{ color: 'var(--warning)' }} />
+            <span className="text-[10px] font-medium" style={{ color: 'var(--warning)' }}>
               {t('diskHealthAdminHint')}
             </span>
           </div>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {disks.map((disk) => (
           <DiskCard key={disk.device} disk={disk} />
         ))}

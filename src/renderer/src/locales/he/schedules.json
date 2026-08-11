@@ -23,7 +23,8 @@
     "noTasksSelected": "לא נבחרו משימות",
     "nextRun": "הבא: {{time}}",
     "lastRun": "אחרון: {{time}}",
-    "neverRun": "לא הופעל מעולם"
+    "neverRun": "לא הופעל מעולם",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "בחר תבנית",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "תחזוקה מעמיקה חודשית",
     "monthlyDeepMaintenanceDescription": "ניקוי מלא + רישום, מנהלי התקנים ותוכנות ב־1 בכל חודש בשעה 10:00",
     "customLabel": "מותאם אישית",
-    "customDescription": "התחל מאפס עם לוח זמנים ריק"
+    "customDescription": "התחל מאפס עם לוח זמנים ריק",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "עריכת לוח זמנים",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "הפעולות יופעלו באופן אוטומטי לפי לוח הזמנים. ודא שרשימת ההחרגות שלך מעודכנת.",
     "cancelButton": "ביטול",
     "saveChangesButton": "שמור שינויים",
-    "createScheduleButton": "צור לוח זמנים"
+    "createScheduleButton": "צור לוח זמנים",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "מערכת",
@@ -96,5 +104,6 @@
     "hoursAgo": "לפני {{count}} שע׳",
     "daysAgo": "לפני {{count}} ימים"
   },
-  "copyNameSuffix": "(עותק)"
+  "copyNameSuffix": "(עותק)",
+  "runNowStarted": "Started \"{{name}}\""
 }

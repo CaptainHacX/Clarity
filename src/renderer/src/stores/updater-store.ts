@@ -7,8 +7,8 @@ import type {
   UpdateResult,
 } from '../../../shared/types'
 
-type SortField = 'name' | 'severity' | 'source'
-type SeverityFilter = 'all' | 'major' | 'minor' | 'patch'
+type SortField = 'name' | 'severity' | 'source' | 'currentVersion' | 'availableVersion'
+type SeverityFilter = 'all' | 'major' | 'minor' | 'patch' | 'unknown'
 
 /**
  * Stable composite identity for a package. With multi-manager aggregation the
@@ -122,7 +122,10 @@ export const useUpdaterStore = create<SoftwareUpdaterState>((set, get) => ({
   setSortField: (sortField) =>
     set((state) => ({
       sortField,
-      sortDirection: sortField === 'severity' ? 'asc' : state.sortDirection,
+      sortDirection:
+        sortField === 'severity' || sortField === 'currentVersion' || sortField === 'availableVersion'
+          ? 'asc'
+          : state.sortDirection,
     })),
   setSortDirection: (sortDirection) => set({ sortDirection }),
   setSeverityFilter: (severityFilter) => set({ severityFilter }),

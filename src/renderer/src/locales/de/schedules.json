@@ -23,7 +23,8 @@
     "noTasksSelected": "Keine Aufgaben ausgewählt",
     "nextRun": "Nächster: {{time}}",
     "lastRun": "Letzter: {{time}}",
-    "neverRun": "Nie ausgeführt"
+    "neverRun": "Nie ausgeführt",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Vorlage auswählen",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Monatliche intensive Wartung",
     "monthlyDeepMaintenanceDescription": "Vollständige Bereinigung + Registrierung, Treiber und Software am 1. um 10:00 Uhr",
     "customLabel": "Benutzerdefiniert",
-    "customDescription": "Mit einem leeren Zeitplan von Grund auf beginnen"
+    "customDescription": "Mit einem leeren Zeitplan von Grund auf beginnen",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Zeitplan bearbeiten",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Aktionen werden automatisch nach Zeitplan ausgeführt. Stellen Sie sicher, dass Ihre Ausschlussliste aktuell ist.",
     "cancelButton": "Abbrechen",
     "saveChangesButton": "Änderungen speichern",
-    "createScheduleButton": "Zeitplan erstellen"
+    "createScheduleButton": "Zeitplan erstellen",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "System",
@@ -96,5 +104,6 @@
     "hoursAgo": "vor {{count}} Std.",
     "daysAgo": "vor {{count}} Tagen"
   },
-  "copyNameSuffix": "(Kopie)"
+  "copyNameSuffix": "(Kopie)",
+  "runNowStarted": "Started \"{{name}}\""
 }

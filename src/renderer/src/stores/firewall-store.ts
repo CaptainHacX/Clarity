@@ -19,6 +19,8 @@ interface FirewallState {
   hasScanned: boolean
   /** Last scan returned an incomplete rule set — findings are real but partial. */
   truncated: boolean
+  /** Epoch ms of the most recent successful scan. */
+  lastScanAt: number | null
 
   searchQuery: string
   riskFilter: RiskFilter
@@ -33,6 +35,7 @@ interface FirewallState {
   setError: (error: string | null) => void
   setHasScanned: (hasScanned: boolean) => void
   setTruncated: (truncated: boolean) => void
+  setLastScanAt: (at: number | null) => void
 
   setSearchQuery: (query: string) => void
   setRiskFilter: (filter: RiskFilter) => void
@@ -55,6 +58,7 @@ export const useFirewallStore = create<FirewallState>((set) => ({
   error: null,
   hasScanned: false,
   truncated: false,
+  lastScanAt: null,
 
   searchQuery: '',
   riskFilter: 'all',
@@ -71,6 +75,7 @@ export const useFirewallStore = create<FirewallState>((set) => ({
   setError: (error) => set({ error }),
   setHasScanned: (hasScanned) => set({ hasScanned }),
   setTruncated: (truncated) => set({ truncated }),
+  setLastScanAt: (lastScanAt) => set({ lastScanAt }),
 
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setRiskFilter: (riskFilter) => set({ riskFilter }),
@@ -103,6 +108,7 @@ export const useFirewallStore = create<FirewallState>((set) => ({
       error: null,
       hasScanned: false,
       truncated: false,
+      lastScanAt: null,
       searchQuery: '',
       riskFilter: 'all',
       programFilter: 'all',

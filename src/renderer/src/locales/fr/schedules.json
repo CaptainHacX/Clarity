@@ -23,7 +23,8 @@
     "noTasksSelected": "Aucune tâche sélectionnée",
     "nextRun": "Prochaine : {{time}}",
     "lastRun": "Dernière : {{time}}",
-    "neverRun": "Jamais exécutée"
+    "neverRun": "Jamais exécutée",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Choisir un modèle",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Maintenance approfondie mensuelle",
     "monthlyDeepMaintenanceDescription": "Nettoyage complet + registre, pilotes et logiciels le 1er de chaque mois à 10 h",
     "customLabel": "Personnalisé",
-    "customDescription": "Commencer à partir d’une planification vide"
+    "customDescription": "Commencer à partir d’une planification vide",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Modifier la planification",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Les actions seront exécutées automatiquement selon le planning. Assurez-vous que votre liste d’exclusions est à jour.",
     "cancelButton": "Annuler",
     "saveChangesButton": "Enregistrer les modifications",
-    "createScheduleButton": "Créer une planification"
+    "createScheduleButton": "Créer une planification",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Système",
@@ -96,5 +104,6 @@
     "hoursAgo": "il y a {{count}} h",
     "daysAgo": "il y a {{count}} j"
   },
-  "copyNameSuffix": "(copie)"
+  "copyNameSuffix": "(copie)",
+  "runNowStarted": "Started \"{{name}}\""
 }

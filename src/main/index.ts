@@ -15,7 +15,7 @@ import { installThreatMonitorAlerts } from './services/threat-monitor-alerts'
 import { threatMonitor } from './services/threat-monitor'
 import { getSettings } from './services/settings-store'
 import { loadWindowState, trackWindowState, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT } from './services/window-state'
-import { startScheduler, stopScheduler, getNextScanTime, notifyScheduledScanComplete, completeScheduleRun } from './services/scheduler'
+import { startScheduler, stopScheduler, getNextScanTime, notifyScheduledScanComplete, completeScheduleRun, runScheduleNow } from './services/scheduler'
 import { startSecurityScheduler, stopSecurityScheduler } from './services/security/security-service'
 import { initAutoUpdater } from './services/auto-updater'
 import { attachRendererDiagnostics } from './services/renderer-diagnostics'
@@ -626,6 +626,12 @@ app.whenReady().then(() => {
     if (typeof scheduleId !== 'string' || typeof status !== 'string') return
     if (!VALID_RUN_STATUSES.has(status)) return
     completeScheduleRun(scheduleId, status as 'success' | 'partial' | 'failed' | 'never')
+  })
+
+  // Run a schedule immediately (Run Now)
+  ipcMain.on(IPC.SCHEDULE_RUN_NOW, (_event, scheduleId: unknown) => {
+    if (typeof scheduleId !== 'string') return
+    runScheduleNow(scheduleId, () => mainWindow)
   })
 
   app.on('activate', () => {

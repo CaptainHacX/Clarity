@@ -43,6 +43,10 @@ const STALE_RULE =
 // A Microsoft rule pointing at a real system binary → built-in, no findings.
 const BUILTIN_RULE =
   'RULE|CoreNet-In|Core Networking (In)|@FirewallAPI.dll,-25000|@FirewallAPI.dll,-25000|Any|Any|Any|Any|%SystemRoot%\\system32\\svchost.exe|C:\\Windows\\system32\\svchost.exe|True|signed|True|False|true'
+// A rule that was disabled after an apply → kept in the list so it can be
+// re-enabled, but it allows nothing so it carries no findings.
+const DISABLED_RULE =
+  'RULE|DisabledApp-In|Disabled App (In)|Lets my app listen||Private|TCP|8080|LocalSubnet|C:\\Apps\\gone.exe|C:\\Apps\\gone.exe|False|not-applicable|False|False|false'
 
 beforeEach(() => {
   mockSpawnTrackedLines.mockReset()
@@ -73,6 +77,17 @@ describe('scanFirewallRules', () => {
     expect(result.rules[0].issues).toContain('stale')
     expect(result.rules[1].builtin).toBe(true)
     expect(result.truncated).toBe(false)
+  })
+
+  it('keeps disabled rules but clears their findings', async () => {
+    stubScan(['TOTAL|1', DISABLED_RULE])
+    const result = await scanFirewallRules()
+
+    expect(result.rules).toHaveLength(1)
+    const r = result.rules[0]
+    expect(r.enabled).toBe(false)
+    expect(r.issues).toEqual([])
+    expect(r.risk).toBe('low')
   })
 
   it('reports progress from PROG markers as they stream in, not after the fact', async () => {

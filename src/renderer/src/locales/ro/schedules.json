@@ -23,7 +23,8 @@
     "noTasksSelected": "Nu sunt selectate sarcini",
     "nextRun": "Următoarea: {{time}}",
     "lastRun": "Ultima: {{time}}",
-    "neverRun": "Nu a rulat niciodată"
+    "neverRun": "Nu a rulat niciodată",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Alegeți un șablon",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Întreținere aprofundată lunară",
     "monthlyDeepMaintenanceDescription": "Curățare completă + registry, drivere și software în ziua de 1 la 10:00",
     "customLabel": "Personalizat",
-    "customDescription": "Porniți de la zero cu o programare goală"
+    "customDescription": "Porniți de la zero cu o programare goală",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Editați programarea",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Acțiunile vor rula automat conform programării. Asigurați-vă că lista de excluderi este actualizată.",
     "cancelButton": "Anulați",
     "saveChangesButton": "Salvați modificările",
-    "createScheduleButton": "Creați programarea"
+    "createScheduleButton": "Creați programarea",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Sistem",
@@ -96,5 +104,6 @@
     "hoursAgo": "acum {{count}} h",
     "daysAgo": "acum {{count}} z"
   },
-  "copyNameSuffix": "(copie)"
+  "copyNameSuffix": "(copie)",
+  "runNowStarted": "Started \"{{name}}\""
 }

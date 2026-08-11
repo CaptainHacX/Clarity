@@ -23,7 +23,8 @@
     "noTasksSelected": "Nessuna attività selezionata",
     "nextRun": "Successiva: {{time}}",
     "lastRun": "Ultima: {{time}}",
-    "neverRun": "Mai eseguita"
+    "neverRun": "Mai eseguita",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Scegli un modello",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Manutenzione approfondita mensile",
     "monthlyDeepMaintenanceDescription": "Pulizia completa + registro, driver e software il giorno 1 alle 10:00",
     "customLabel": "Personalizzata",
-    "customDescription": "Inizia da zero con una pianificazione vuota"
+    "customDescription": "Inizia da zero con una pianificazione vuota",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Modifica pianificazione",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Le azioni verranno eseguite automaticamente secondo la pianificazione. Assicurati che l'elenco delle esclusioni sia aggiornato.",
     "cancelButton": "Annulla",
     "saveChangesButton": "Salva modifiche",
-    "createScheduleButton": "Crea pianificazione"
+    "createScheduleButton": "Crea pianificazione",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Sistema",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} h fa",
     "daysAgo": "{{count}} g fa"
   },
-  "copyNameSuffix": "(copia)"
+  "copyNameSuffix": "(copia)",
+  "runNowStarted": "Started \"{{name}}\""
 }

@@ -10,6 +10,7 @@ import type {
   PerfProcessList,
   PerfKillResult,
   DiskSmartInfo,
+  DiskVolumeUsage,
   HardwareHealthSnapshot,
   StartupItem
 } from '../../shared/types'
@@ -28,6 +29,7 @@ export class PerfMonitorService {
   private snapshotRunning = false
   private processesRunning = false
   private hardwareHealthRunning = false
+  private volumesRunning = false
   // Cache expensive si.networkStats() — poll every 5s, reuse in between
   private cachedNetworkStats = { rxBytesPerSec: 0, txBytesPerSec: 0 }
   private lastNetworkPoll = 0
@@ -35,34 +37,65 @@ export class PerfMonitorService {
   // Thermal/battery sensors are slow and often need elevated privileges on
   // some platforms — poll on a 30s cadence, never on the 1s tick.
   private readonly HARDWARE_POLL_INTERVAL_MS = 30_000
+  // Swap usage comes from si.mem(), which is expensive on Windows — cache it
+  // from the slow process-list tick (every 10s) instead of the fast tick.
+  private cachedSwap = { usedBytes: 0, totalBytes: 0, percent: 0 }
+  // Data cadence for the fast tick, configurable from the renderer.
+  private refreshIntervalMs = 1000
 
   async getSystemInfo(): Promise<PerfSystemInfo> {
     if (this.cachedSystemInfo) return this.cachedSystemInfo
 
-    const [cpu, os, mem] = await Promise.all([si.cpu(), si.osInfo(), si.mem()])
+    const [cpu, osInfo, mem] = await Promise.all([si.cpu(), si.osInfo(), si.mem()])
 
     this.cachedSystemInfo = {
       cpuModel: `${cpu.manufacturer} ${cpu.brand}`,
       cpuCores: cpu.physicalCores,
       cpuThreads: cpu.cores,
       totalMemBytes: mem.total,
-      osVersion: `${os.distro} ${os.release}`,
-      hostname: os.hostname
+      osVersion: `${osInfo.distro} ${osInfo.release}`,
+      platform: process.platform,
+      kernel: osInfo.kernel || null,
+      arch: osInfo.arch || null,
+      hostname: osInfo.hostname
     }
     return this.cachedSystemInfo
   }
 
+  /** Reconfigure the fast-tick cadence without stopping other timers. */
+  setRefreshInterval(intervalMs: number): void {
+    const clamped = Math.max(1000, Math.min(intervalMs, 15 * 60 * 1000))
+    this.refreshIntervalMs = clamped
+    if (this.fastTimer) {
+      clearInterval(this.fastTimer)
+      this.fastTimer = setInterval(() => this.collectSnapshot(), this.refreshIntervalMs)
+    }
+  }
+
+  /** Force an immediate refresh of every data source (used by "Refresh Now"). */
+  async refreshNow(): Promise<void> {
+    await Promise.allSettled([
+      this.collectSnapshot(),
+      this.collectProcesses(),
+      this.collectVolumes(),
+      this.collectHardwareHealth()
+    ])
+  }
+
   async startMonitoring(
     sender: Electron.WebContents,
-    getStartupItems?: () => Promise<StartupItem[]>
+    getStartupItems?: () => Promise<StartupItem[]>,
+    intervalMs?: number
   ): Promise<void> {
     // If already running, just update the sender
     if (this.fastTimer) {
       this.sender = sender
+      if (intervalMs) this.setRefreshInterval(intervalMs)
       return
     }
 
     this.sender = sender
+    if (intervalMs) this.refreshIntervalMs = Math.max(1000, Math.min(intervalMs, 15 * 60 * 1000))
 
     // Build startup exe map for correlation
     if (getStartupItems) {
@@ -81,14 +114,18 @@ export class PerfMonitorService {
       }
     }
 
-    // Fast interval: system metrics every 1s
-    this.fastTimer = setInterval(() => this.collectSnapshot(), 1000)
+    // Fast interval: system metrics every refreshIntervalMs (default 1s)
+    this.fastTimer = setInterval(() => this.collectSnapshot(), this.refreshIntervalMs)
     // Collect immediately
     this.collectSnapshot()
 
-    // Slow interval: process list every 10s (si.processes() is expensive)
-    this.slowTimer = setInterval(() => this.collectProcesses(), 10000)
+    // Slow interval: process list + disk volumes every 10s (si.processes() is expensive)
+    this.slowTimer = setInterval(() => {
+      this.collectProcesses()
+      this.collectVolumes()
+    }, 10000)
     this.collectProcesses()
+    this.collectVolumes()
 
     // Hardware health: thermal + battery every 30s (sensor reads are slow)
     this.hardwareTimer = setInterval(() => this.collectHardwareHealth(), this.HARDWARE_POLL_INTERVAL_MS)
@@ -219,14 +256,18 @@ export class PerfMonitorService {
       return Math.round(main)
     })()
 
-    const gpuTemperatures = (() => {
+    const gpus = (() => {
       if (graphics.status !== 'fulfilled') return []
-      const out: HardwareHealthSnapshot['gpuTemperatures'] = []
+      const out: HardwareHealthSnapshot['gpus'] = []
       for (const c of graphics.value.controllers ?? []) {
         const t = c.temperatureGpu
+        const load = c.utilizationGpu
+        const vram = typeof c.memoryTotal === 'number' && c.memoryTotal > 0 ? c.memoryTotal : null
         out.push({
           name: c.model || 'GPU',
           temperature: typeof t === 'number' && t > 0 ? Math.round(t) : null,
+          loadPercent: typeof load === 'number' && load >= 0 ? Math.round(load) : null,
+          vramBytes: vram,
         })
       }
       return out
@@ -259,7 +300,7 @@ export class PerfMonitorService {
     return {
       timestamp: Date.now(),
       cpuTemperature,
-      gpuTemperatures,
+      gpus,
       battery: batteryData,
     }
   }
@@ -378,6 +419,7 @@ export class PerfMonitorService {
           cachedBytes: cachedMem,
           percent: (usedMem / totalMem) * 100
         },
+        swap: this.cachedSwap,
         disk: {
           readBytesPerSec: disk?.rIO_sec ?? 0,
           writeBytesPerSec: disk?.wIO_sec ?? 0
@@ -407,6 +449,17 @@ export class PerfMonitorService {
     try {
       const [data, mem] = await Promise.all([si.processes(), si.mem()])
       const totalMem = mem.total
+
+      // Cache swap usage for the fast snapshot tick
+      if (typeof mem.swapused === 'number' && typeof mem.swaptotal === 'number') {
+        const usedBytes = mem.swapused
+        const totalBytes = mem.swaptotal
+        this.cachedSwap = {
+          usedBytes,
+          totalBytes,
+          percent: totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0
+        }
+      }
 
       // Sort by CPU + memory and take top 100
       const sorted = data.list
@@ -445,6 +498,39 @@ export class PerfMonitorService {
       // Silently skip failed ticks
     } finally {
       this.processesRunning = false
+    }
+  }
+
+  /** Poll filesystem volume sizes on the slow cadence (fsSize is not free). */
+  private async collectVolumes(): Promise<void> {
+    if (!this.sender || this.sender.isDestroyed()) {
+      this.stopMonitoring()
+      return
+    }
+    if (this.volumesRunning) return
+    this.volumesRunning = true
+
+    try {
+      const fs = await si.fsSize()
+      const volumes: DiskVolumeUsage[] = fs
+        .filter((f) => f.size > 0)
+        .map((f) => ({
+          mount: f.mount,
+          name: f.fs || f.mount,
+          fsType: f.type || 'Unknown',
+          totalBytes: f.size,
+          usedBytes: f.used,
+          freeBytes: f.size - f.used,
+          percent: f.size > 0 ? (f.used / f.size) * 100 : 0
+        }))
+
+      if (!this.sender.isDestroyed()) {
+        this.sender.send(IPC.PERF_DISK_VOLUMES, volumes)
+      }
+    } catch {
+      // Silently skip failed reads
+    } finally {
+      this.volumesRunning = false
     }
   }
 }

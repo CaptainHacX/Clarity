@@ -23,7 +23,8 @@
     "noTasksSelected": "Задачи не выбраны",
     "nextRun": "Следующий запуск: {{time}}",
     "lastRun": "Последний запуск: {{time}}",
-    "neverRun": "Никогда не запускалось"
+    "neverRun": "Никогда не запускалось",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Выберите шаблон",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Ежемесячное глубокое обслуживание",
     "monthlyDeepMaintenanceDescription": "Полная очистка + реестр, драйверы и программы 1-го числа в 10:00",
     "customLabel": "Пользовательский",
-    "customDescription": "Начать с пустого расписания"
+    "customDescription": "Начать с пустого расписания",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Изменить расписание",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Действия будут выполняться автоматически по расписанию. Убедитесь, что список исключений актуален.",
     "cancelButton": "Отмена",
     "saveChangesButton": "Сохранить изменения",
-    "createScheduleButton": "Создать расписание"
+    "createScheduleButton": "Создать расписание",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Система",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} ч назад",
     "daysAgo": "{{count}} дн. назад"
   },
-  "copyNameSuffix": "(копия)"
+  "copyNameSuffix": "(копия)",
+  "runNowStarted": "Started \"{{name}}\""
 }

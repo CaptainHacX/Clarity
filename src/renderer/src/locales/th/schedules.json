@@ -23,7 +23,8 @@
     "noTasksSelected": "ไม่ได้เลือกงาน",
     "nextRun": "ถัดไป: {{time}}",
     "lastRun": "ล่าสุด: {{time}}",
-    "neverRun": "ยังไม่เคยเรียกใช้"
+    "neverRun": "ยังไม่เคยเรียกใช้",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "เลือกเทมเพลต",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "บำรุงรักษาเชิงลึกรายเดือน",
     "monthlyDeepMaintenanceDescription": "ล้างข้อมูลทั้งหมด + registry ไดรเวอร์ และซอฟต์แวร์ ในวันที่ 1 เวลา 10:00 น.",
     "customLabel": "กำหนดเอง",
-    "customDescription": "เริ่มต้นใหม่ด้วยกำหนดการว่างเปล่า"
+    "customDescription": "เริ่มต้นใหม่ด้วยกำหนดการว่างเปล่า",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "แก้ไขกำหนดการ",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "การดำเนินการจะทำงานโดยอัตโนมัติตามกำหนดเวลา โปรดตรวจสอบให้แน่ใจว่ารายการยกเว้นของคุณเป็นข้อมูลล่าสุด",
     "cancelButton": "ยกเลิก",
     "saveChangesButton": "บันทึกการเปลี่ยนแปลง",
-    "createScheduleButton": "สร้างกำหนดการ"
+    "createScheduleButton": "สร้างกำหนดการ",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "ระบบ",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} ชั่วโมงที่แล้ว",
     "daysAgo": "{{count}} วันที่แล้ว"
   },
-  "copyNameSuffix": "(สำเนา)"
+  "copyNameSuffix": "(สำเนา)",
+  "runNowStarted": "Started \"{{name}}\""
 }

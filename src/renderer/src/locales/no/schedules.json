@@ -23,7 +23,8 @@
     "noTasksSelected": "Ingen oppgaver valgt",
     "nextRun": "Neste: {{time}}",
     "lastRun": "Sist: {{time}}",
-    "neverRun": "Aldri kjørt"
+    "neverRun": "Aldri kjørt",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Velg en mal",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Månedlig dyptgående vedlikehold",
     "monthlyDeepMaintenanceDescription": "Full opprydding + register, drivere og programvare den 1. kl. 10:00",
     "customLabel": "Tilpasset",
-    "customDescription": "Start fra bunnen av med en tom tidsplan"
+    "customDescription": "Start fra bunnen av med en tom tidsplan",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Rediger tidsplan",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Handlinger kjøres automatisk etter tidsplanen. Sørg for at ekskluderingslisten er oppdatert.",
     "cancelButton": "Avbryt",
     "saveChangesButton": "Lagre endringer",
-    "createScheduleButton": "Opprett tidsplan"
+    "createScheduleButton": "Opprett tidsplan",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "System",
@@ -96,5 +104,6 @@
     "hoursAgo": "for {{count}}h siden",
     "daysAgo": "for {{count}}d siden"
   },
-  "copyNameSuffix": "(kopi)"
+  "copyNameSuffix": "(kopi)",
+  "runNowStarted": "Started \"{{name}}\""
 }

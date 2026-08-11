@@ -23,7 +23,8 @@
     "noTasksSelected": "Tehtäviä ei ole valittu",
     "nextRun": "Seuraava: {{time}}",
     "lastRun": "Viimeksi: {{time}}",
-    "neverRun": "Ei koskaan suoritettu"
+    "neverRun": "Ei koskaan suoritettu",
+    "runNowAction": "Run Now"
   },
   "presets": {
     "dialogTitle": "Valitse malli",
@@ -34,7 +35,10 @@
     "monthlyDeepMaintenanceLabel": "Kuukausittainen perusteellinen ylläpito",
     "monthlyDeepMaintenanceDescription": "Täysi puhdistus + rekisteri, ohjaimet ja ohjelmistot kuukauden 1. päivänä klo 10",
     "customLabel": "Mukautettu",
-    "customDescription": "Aloita tyhjästä tyhjällä aikataululla"
+    "customDescription": "Aloita tyhjästä tyhjällä aikataululla",
+    "dialogDescription": "Start with a template or build your own schedule",
+    "recommendedBadge": "Recommended",
+    "taskCount": "{{count}} tasks"
   },
   "dialog": {
     "editTitle": "Muokkaa aikataulua",
@@ -57,7 +61,11 @@
     "autoApplyWarning": "Toiminnot suoritetaan automaattisesti aikataulun mukaan. Varmista, että poissulkemisluettelosi on ajan tasalla.",
     "cancelButton": "Peruuta",
     "saveChangesButton": "Tallenna muutokset",
-    "createScheduleButton": "Luo aikataulu"
+    "createScheduleButton": "Luo aikataulu",
+    "nameRequired": "Give your schedule a name",
+    "nameDuplicate": "A schedule with this name already exists",
+    "tasksRequired": "Select at least one task",
+    "notAvailableOnPlatform": "Not available on this OS"
   },
   "tasks": {
     "system": "Järjestelmä",
@@ -96,5 +104,6 @@
     "hoursAgo": "{{count}} h sitten",
     "daysAgo": "{{count}} pv sitten"
   },
-  "copyNameSuffix": "(kopio)"
+  "copyNameSuffix": "(kopio)",
+  "runNowStarted": "Started \"{{name}}\""
 }

@@ -24,7 +24,7 @@ export function ProcessTable() {
     let list = processList
     if (filter) {
       const q = filter.toLowerCase()
-      list = list.filter((p) => p.name.toLowerCase().includes(q))
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || String(p.pid).includes(q))
     }
 
     list = [...list].sort((a, b) => {
@@ -64,9 +64,9 @@ export function ProcessTable() {
       onClick={() => setSort(column)}
       className={cn(
         'flex items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wider transition-colors',
-        sortColumn === column ? 'text-amber-400' : 'text-zinc-600 hover:text-zinc-400'
+        sortColumn === column ? 'text-amber-400' : ''
       )}
-      style={{ width }}
+      style={{ width, color: sortColumn === column ? 'var(--accent)' : 'var(--text-muted)' }}
     >
       {label}
       <ArrowUpDown className="h-3 w-3" />
@@ -80,14 +80,11 @@ export function ProcessTable() {
   }
 
   return (
-    <div
-      className="rounded-2xl p-5"
-      style={{ background: 'var(--card-bg)', border: '1px solid var(--border-default)' }}
-    >
+    <div className="glass-card rounded-2xl p-5">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <span className="text-[13px] font-semibold text-white">{t('processes')}</span>
+          <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('processes')}</span>
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
             {processCount} {t('totalSuffix')}
           </span>
@@ -102,8 +99,8 @@ export function ProcessTable() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t('filterProcessesPlaceholder')}
-            className="bg-transparent text-[12px] text-zinc-300 placeholder-zinc-600 outline-none"
-            style={{ width: 160 }}
+            className="bg-transparent text-[12px] outline-none"
+            style={{ width: 160, color: 'var(--text-primary)' }}
           />
           {filter && (
             <button onClick={() => setFilter('')}>
@@ -115,23 +112,33 @@ export function ProcessTable() {
 
       {/* Column headers */}
       <div className="mb-2 flex items-center gap-2 px-2">
-        <SortHeader column="name" label={t('columnName')} width="40%" />
-        <SortHeader column="pid" label={t('columnPid')} width="12%" />
-        <SortHeader column="cpuPercent" label={t('columnCpu')} width="20%" />
-        <SortHeader column="memBytes" label={t('columnMemory')} width="18%" />
-        <div style={{ width: '10%' }} />
+        <SortHeader column="name" label={t('columnName')} width="30%" />
+        <SortHeader column="pid" label={t('columnPid')} width="9%" />
+        <SortHeader column="cpuPercent" label={t('columnCpu')} width="16%" />
+        <SortHeader column="memBytes" label={t('columnMemory')} width="13%" />
+        <SortHeader column="memPercent" label={t('columnMemPercent')} width="10%" />
+        <SortHeader column="user" label={t('columnUser')} width="15%" />
+        <div style={{ width: '7%' }} />
       </div>
 
       {/* Rows */}
       <div className="max-h-[340px] space-y-0.5 overflow-y-auto pr-1">
+        {filtered.length === 0 && (
+          <div className="px-2 py-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            {t('noDataPlaceholder')}
+          </div>
+        )}
         {filtered.map((p) => (
           <div
             key={p.pid}
-            className="group flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-white/[0.02]"
+            className="group flex items-center gap-2 rounded-lg px-2 py-2 transition-colors"
+            style={{ background: 'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
           >
             {/* Name */}
-            <div className="flex items-center gap-2" style={{ width: '40%' }}>
-              <span className="truncate text-[12px] font-medium text-zinc-300">{p.name}</span>
+            <div className="flex items-center gap-2" style={{ width: '30%' }}>
+              <span className="truncate text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
               {p.isStartupItem && (
                 <span
                   className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase"
@@ -145,12 +152,12 @@ export function ProcessTable() {
             </div>
 
             {/* PID */}
-            <span className="text-[11px] font-mono" style={{ width: '12%', color: 'var(--text-muted)' }}>
+            <span className="text-[11px] font-mono" style={{ width: '9%', color: 'var(--text-muted)' }}>
               {p.pid}
             </span>
 
             {/* CPU */}
-            <div style={{ width: '20%' }} className="flex items-center gap-2">
+            <div style={{ width: '16%' }} className="flex items-center gap-2">
               <div className="h-1.5 flex-1 rounded-full" style={{ background: 'var(--bg-subtle-2)' }}>
                 <div
                   className="h-full rounded-full transition-all"
@@ -160,18 +167,28 @@ export function ProcessTable() {
                   }}
                 />
               </div>
-              <span className="w-10 text-right text-[11px] font-mono text-zinc-400">
+              <span className="w-10 text-right text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>
                 {p.cpuPercent.toFixed(1)}
               </span>
             </div>
 
             {/* Memory */}
-            <span className="text-[11px] font-mono text-zinc-400" style={{ width: '18%' }}>
+            <span className="text-[11px] font-mono" style={{ width: '13%', color: 'var(--text-secondary)' }}>
               {formatBytes(p.memBytes, 1)}
             </span>
 
+            {/* Mem % */}
+            <span className="text-[11px] font-mono" style={{ width: '10%', color: 'var(--text-muted)' }}>
+              {p.memPercent.toFixed(1)}%
+            </span>
+
+            {/* User */}
+            <span className="truncate text-[11px]" style={{ width: '15%', color: 'var(--text-muted)' }}>
+              {p.user || '--'}
+            </span>
+
             {/* Kill */}
-            <div style={{ width: '10%' }} className="flex justify-end">
+            <div style={{ width: '7%' }} className="flex justify-end">
               <button
                 onClick={() => setKillTarget(p)}
                 className="rounded-lg px-2 py-1 text-[10px] font-medium opacity-0 transition-all group-hover:opacity-100"
