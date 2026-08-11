@@ -776,6 +776,32 @@ export interface SystemHealthReportDisk {
   percent: number
 }
 
+export interface SystemHealthReportGpu {
+  model: string
+  vendor: string
+  vramGb: number
+  driverVersion: string
+  bus: string
+  temperatureC: number | null
+  utilizationPct: number | null
+}
+
+export interface SystemHealthReportProcess {
+  name: string
+  pid: number
+  percent: number
+}
+
+export type HealthCheckStatus = 'ok' | 'warning' | 'critical'
+
+export interface SystemHealthReportCheck {
+  /** Stable key the renderer maps to a localized label (cpu, memory, disk, ...). */
+  key: string
+  status: HealthCheckStatus
+  /** Short human-readable detail already localized for the report, e.g. "78% used". */
+  detail: string
+}
+
 /** A one-shot snapshot of overall system health, rendered as a report. */
 export interface SystemHealthReport {
   generatedAt: number
@@ -795,21 +821,74 @@ export interface SystemHealthReport {
     cpuModel: string
     cpuCores: number
     cpuThreads: number
-    totalMemGb: number
+    osBuild: string
+    osCodename: string
+    osUefi: boolean | null
+    osHypervisor: boolean | null
+    biosVendor: string
+    biosVersion: string
+    timezone: string
+    timezoneName: string
+    cpuSpeedGhZ: number | null
+    cpuMaxSpeedGhZ: number | null
+    cpuVirtualization: boolean | null
+    cpuCacheL3Mb: number | null
+    currentCpuLoad: number | null
+    loadAverage1: number | null
+    loadAverage5: number | null
+    loadAverage15: number | null
+  }
+  memory: {
+    totalGb: number
+    usedGb: number
+    freeGb: number
+    usedPercent: number
+    activeGb: number
+    swapTotalGb: number
+    swapUsedGb: number
+    swapPercent: number
   }
   disk: SystemHealthReportDisk[]
+  gpu: SystemHealthReportGpu[]
+  processes: {
+    total: number
+    running: number
+    sleeping: number
+    blocked: number
+    topCpu: SystemHealthReportProcess | null
+    topMem: SystemHealthReportProcess | null
+  }
   health: {
     cpuTemperatureC: number | null
     batteryPercent: number | null
     batteryHealthPercent: number | null
     batteryCharging: boolean | null
     batteryPresent: boolean
+    batteryCycleCount: number | null
+    batteryTimeRemainingMin: number | null
+    batteryAcConnected: boolean | null
+    batteryVoltageV: number | null
+    batteryType: string | null
   }
   network: {
     wifiSecurity: string
+    wifiSecurityDetail: string | null
+    wifiSsid: string | null
+    wifiSignalPct: number | null
+    wifiChannel: number | null
     vpnDetected: boolean
+    vpnInterfaces: string[]
     gateway: string | null
     ipv4: string | null
+    ipv6: string | null
+    interfaceCount: number
+    nearbyNetworks: number
+    locationAccess: string
+  }
+  /** Derived overall health posture: 0-100 score plus per-subsystem checks. */
+  summary: {
+    score: number
+    checks: SystemHealthReportCheck[]
   }
   alerts: AlertEvent[]
   /** Pre-rendered markdown document for export / copy. */
