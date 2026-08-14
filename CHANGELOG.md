@@ -1,3 +1,19 @@
+# [1.0.4](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.4) (2026-08-15)
+
+### Features
+
+* **release:** sign Windows installers via SignPath Foundation, publishing a trusted, SmartScreen-friendly `Clarity-Setup.exe`
+* **updater:** keep "Check for updates" working on any build by falling back to the GitHub releases API when the packaged update metadata is absent
+
+### Bug Fixes
+
+* **updater:** stop "Check for updates" from crashing with ENOENT on locally built (`--dir`) packages
+* **build:** restore type compatibility with Electron 41 and systeminformation
+
+### Chore
+
+* add unit tests for the version-comparison helper used by the updater fallback
+
 # [1.0.2](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.2) (2026-08-15)
 
 ### Features
