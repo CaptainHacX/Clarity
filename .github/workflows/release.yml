@@ -142,7 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           npx electron-vite build
-          npx electron-builder ${{ matrix.build-args }}
+          npx electron-builder ${{ matrix.build-args }} --publish never
 
       - name: Get version from tag
         if: runner.os == 'Windows'
