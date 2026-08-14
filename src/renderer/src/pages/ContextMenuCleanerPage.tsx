@@ -456,7 +456,7 @@ function ContextMenuCleanerPageContent() {
 
       {selectedCount > 0 && !applying && (
         <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-2xl px-3 py-2"
-          style={{ background: 'var(--card-bg)', border: '1px solid var(--border-medium)', boxShadow: '0 12px 40px rgba(0,0,0,0.35)' }}>
+          style={{ background: 'var(--card-bg)', border: '1px solid var(--border-medium)', boxShadow: '0 12px 40px var(--flyout-shadow)' }}>
           <span className="px-3 text-[12px] font-medium text-zinc-300">
             {t('selectedCount', { count: selectedCount })}
           </span>

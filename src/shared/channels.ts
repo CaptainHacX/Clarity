@@ -257,6 +257,9 @@ export const IPC = {
   // History push events (main -> renderer)
   HISTORY_CHANGED: 'history:changed',
 
+  // Tray (main -> renderer): ask the window to navigate to a route
+  TRAY_NAVIGATE: 'tray:navigate',
+
   // Large File Finder
   LARGE_FILES_SCAN: 'large-files:scan',
   LARGE_FILES_CANCEL: 'large-files:cancel',

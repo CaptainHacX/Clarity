@@ -150,6 +150,7 @@ export function App() {
     <PlatformContext value={platformInfo}>
     <HashRouter>
       <PageTitleUpdater />
+      <TrayNavigationBridge />
       {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
       <AppShell>
         <Routes>
@@ -204,7 +205,7 @@ export function App() {
             WebkitBackdropFilter: 'blur(24px)',
             border: '1px solid var(--border-strong)',
             color: 'var(--toast-text)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 var(--glass-inset)'
+            boxShadow: 'var(--toast-shadow)'
           }
         }}
       />
@@ -251,6 +252,26 @@ const ROUTE_TITLES: Record<string, { key: string; ns?: string } | string> = {
   '/updates': 'Software Updates',
   '/schedules': { key: 'schedules' },
   '/drivers': 'Driver Updates',
+}
+
+// Routes the tray is allowed to ask us to open (mirrors TRAY_NAV_ITEMS in main).
+const TRAY_NAV_ROUTES = new Set(['/', '/cleaner', '/malware', '/performance', '/settings'])
+
+/**
+ * Listens for tray-driven navigation (e.g. "Open → Cleaner") and moves the
+ * hash router to the requested page. The route list is validated on receipt —
+ * the tray must never be able to point the window at an arbitrary hash.
+ */
+function TrayNavigationBridge() {
+  useEffect(() => {
+    const unsub = window.clarity?.onTrayNavigate?.((route) => {
+      if (typeof route !== 'string') return
+      if (!TRAY_NAV_ROUTES.has(route)) return
+      window.location.hash = `#${route}`
+    })
+    return () => { unsub?.() }
+  }, [])
+  return null
 }
 
 function PageTitleUpdater() {

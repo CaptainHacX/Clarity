@@ -198,17 +198,15 @@ export function SystemHealthReportPage() {
                   report.summary.checks.map((c) => (
                     <div
                       key={c.key}
-                      className="flex items-center justify-between gap-4 rounded-xl px-4 py-2 text-[13px]"
+                      className="flex items-center gap-4 rounded-xl px-4 py-2 text-[13px]"
                       style={{ background: 'var(--bg-subtle)' }}
                     >
-                      <span className="flex items-center gap-2.5">
+                      <span className="flex min-w-0 flex-1 items-center gap-3">
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_COLOR[c.status] }} />
-                        <span className="font-medium text-zinc-200">{t(`check.${c.key}`)}</span>
+                        <span className="whitespace-nowrap font-medium text-zinc-200">{t(`check.${c.key}`)}</span>
+                        <span className="truncate" style={{ color: 'var(--text-muted)' }}>{c.detail}</span>
                       </span>
-                      <span className="flex items-center gap-3">
-                        <span style={{ color: 'var(--text-muted)' }}>{c.detail}</span>
-                        <Badge status={c.status}>{t(`status.${c.status}`)}</Badge>
-                      </span>
+                      <Badge status={c.status}>{t(`status.${c.status}`)}</Badge>
                     </div>
                   ))
                 )}

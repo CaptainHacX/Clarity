@@ -30,10 +30,11 @@ export class PerfMonitorService {
   private processesRunning = false
   private hardwareHealthRunning = false
   private volumesRunning = false
-  // Cache expensive si.networkStats() — poll every 5s, reuse in between
+  // Cache si.networkStats() and poll it a bit less often than the fast tick so
+  // the gauge/chart stay responsive without a syscall per second.
   private cachedNetworkStats = { rxBytesPerSec: 0, txBytesPerSec: 0 }
   private lastNetworkPoll = 0
-  private readonly NETWORK_POLL_INTERVAL_MS = 5000
+  private readonly NETWORK_POLL_INTERVAL_MS = 2000
   // Thermal/battery sensors are slow and often need elevated privileges on
   // some platforms — poll on a 30s cadence, never on the 1s tick.
   private readonly HARDWARE_POLL_INTERVAL_MS = 30_000
@@ -377,7 +378,7 @@ export class PerfMonitorService {
 
       const [load, disk, net, mem] = await Promise.all([
         si.currentLoad(),
-        si.disksIO(),
+        this.collectDiskIo(),
         needsNetworkPoll ? si.networkStats() : Promise.resolve(null),
         isWindows ? Promise.resolve(null) : si.mem()
       ])
@@ -421,8 +422,8 @@ export class PerfMonitorService {
         },
         swap: this.cachedSwap,
         disk: {
-          readBytesPerSec: disk?.rIO_sec ?? 0,
-          writeBytesPerSec: disk?.wIO_sec ?? 0
+          readBytesPerSec: disk?.readBytesPerSec ?? 0,
+          writeBytesPerSec: disk?.writeBytesPerSec ?? 0
         },
         network: this.cachedNetworkStats,
         uptime: si.time().uptime
@@ -436,6 +437,58 @@ export class PerfMonitorService {
     } finally {
       this.snapshotRunning = false
     }
+  }
+
+  /**
+   * Best-effort disk I/O in bytes/sec.
+   *
+   * si.disksIO() is only correct on Linux (it reads /sys/block sector stats).
+   * On macOS it positionally parses the IOBlockStorageDriver "Statistics"
+   * dictionary (after tr-flattening) and ends up reporting operation *counts*
+   * (Operations Read/Write) instead of byte counters, so rIO_sec/wIO_sec hover
+   * near zero even under heavy load. On Windows disksIO() and fsStats() both
+   * resolve to null. So each platform needs its own source:
+   *  - darwin: si.fsStats() uses the correct dictionary indices (Bytes Read/Write)
+   *  - linux:  si.disksIO() reads sector counters from /sys/block
+   *  - win32:  formatted physical-disk perf counters already expose rates
+   */
+  private async collectDiskIo(): Promise<{ readBytesPerSec: number; writeBytesPerSec: number } | null> {
+    try {
+      const platform = process.platform
+      if (platform === 'darwin') {
+        const fs = await si.fsStats()
+        if (!fs) return null
+        return {
+          readBytesPerSec: fs.rx_sec ?? 0,
+          writeBytesPerSec: fs.wx_sec ?? 0
+        }
+      }
+      if (platform === 'linux') {
+        const disk = await si.disksIO()
+        if (!disk) return null
+        return {
+          readBytesPerSec: disk.rIO_sec ?? 0,
+          writeBytesPerSec: disk.wIO_sec ?? 0
+        }
+      }
+      if (platform === 'win32') {
+        const script =
+          "Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | Where-Object { $_.Name -eq '_Total' } | Select-Object @{n='ReadBytesPerSec';e={[long]$_.DiskReadBytesPerSec}}, @{n='WriteBytesPerSec';e={[long]$_.DiskWriteBytesPerSec}} | ConvertTo-Json -Compress"
+        const { stdout } = await execFileAsync(
+          'powershell.exe',
+          ['-NoProfile', '-NonInteractive', '-Command', psUtf8(script)],
+          { timeout: 10_000, windowsHide: true }
+        )
+        const parsed = JSON.parse(stdout.trim())
+        return {
+          readBytesPerSec: Number(parsed.ReadBytesPerSec) || 0,
+          writeBytesPerSec: Number(parsed.WriteBytesPerSec) || 0
+        }
+      }
+    } catch {
+      // Best-effort — failed reads fall back to zero rates.
+    }
+    return null
   }
 
   private async collectProcesses(): Promise<void> {

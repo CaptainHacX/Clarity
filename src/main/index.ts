@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, screen, session, shell, Tray } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, session, shell, Tray } from 'electron'
 import { execFile } from 'child_process'
 import { readFileSync } from 'fs'
 import { randomUUID } from 'crypto'
@@ -10,12 +10,15 @@ import { execNativeUtf8, killAllChildren } from './services/exec-utf8'
 import { IPC } from '../shared/channels'
 import { t } from './i18n'
 import { registerCleanerIpc } from './ipc'
+import { runSystemScan } from './ipc/system-cleaner.ipc'
 import { alertMonitor } from './services/alert-monitor'
 import { installThreatMonitorAlerts } from './services/threat-monitor-alerts'
 import { threatMonitor } from './services/threat-monitor'
-import { getSettings } from './services/settings-store'
+import { getSettings, setSettings } from './services/settings-store'
 import { loadWindowState, trackWindowState, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT } from './services/window-state'
-import { startScheduler, stopScheduler, getNextScanTime, notifyScheduledScanComplete, completeScheduleRun, runScheduleNow } from './services/scheduler'
+import { startScheduler, stopScheduler, getNextScanTime, notifyScheduledScanComplete, completeScheduleRun, runScheduleNow, runSoonestScheduleNow, hasEnabledSchedules } from './services/scheduler'
+import { createRestorePoint } from './services/restore-point'
+import { menuIconPng, overlayDotOnBitmap, recolorBitmap, type StatusColor, type MenuIconName } from './services/tray-icons'
 import { startSecurityScheduler, stopSecurityScheduler } from './services/security/security-service'
 import { initAutoUpdater } from './services/auto-updater'
 import { attachRendererDiagnostics } from './services/renderer-diagnostics'
@@ -134,7 +137,8 @@ function createTrayIcon(): Electron.NativeImage {
   if (process.platform === 'darwin') {
     // Build a multi-resolution image so the icon is sharp on Retina displays.
     // Uses pre-rendered 16×16 (@1x) and 32×32 (@2x) PNGs instead of
-    // down-scaling the 1024×1024 app icon at runtime.
+    // down-scaling the 1024×1024 app icon at runtime. Template images render
+    // black and let macOS invert them for light/dark menu bars automatically.
     const dir = getIconsDir()
     const trayIcon = nativeImage.createEmpty()
     trayIcon.addRepresentation({ scaleFactor: 1.0, width: 16, height: 16, buffer: readFileSync(join(dir, '16x16.png')) })
@@ -143,12 +147,47 @@ function createTrayIcon(): Electron.NativeImage {
     return trayIcon
   }
 
-  // Windows / Linux: load the main icon and resize to standard tray size
-  const ext = process.platform === 'win32' ? 'ico' : 'png'
-  const iconPath = app.isPackaged
-    ? join(process.resourcesPath, `icon.${ext}`)
-    : join(__dirname, `../../resources/icon.${ext}`)
-  return nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+  // Windows / Linux: draw the brand mark ourselves at 1x and 2x, tinted for the
+  // current OS theme. Down-scaling the full-color 1024² app icon to 16px ends
+  // up muddy and nearly invisible at tray size; a monochrome, high-contrast
+  // mark with a @2x representation stays crisp and legible on any taskbar.
+  return brandMarkImage({ tint: true })
+}
+
+/** Dark glyph on light chrome, light glyph on dark chrome. */
+function themeGlyphColor(): readonly [number, number, number] {
+  return nativeTheme.shouldUseDarkColors ? [232, 232, 232] : [26, 26, 26]
+}
+
+/** A crisp high-DPI nativeImage for one tray menu glyph (Windows/Linux only). */
+function menuGlyphImage(name: MenuIconName): Electron.NativeImage {
+  const color = themeGlyphColor()
+  const img = nativeImage.createEmpty()
+  img.addRepresentation({ scaleFactor: 1, width: 16, height: 16, buffer: menuIconPng(name, color, 16) })
+  img.addRepresentation({ scaleFactor: 2, width: 32, height: 32, buffer: menuIconPng(name, color, 32) })
+  return img
+}
+
+/** One brand-mark representation, optionally re-tinted and with a status dot. */
+function brandMarkRep(size: 16 | 32, opts: { tint?: boolean; dot?: StatusColor | null }): Buffer {
+  const rep = nativeImage.createFromPath(join(getIconsDir(), `${size}x${size}.png`))
+  const bitmap = rep.toBitmap()
+  if (!bitmap || bitmap.length === 0) return Buffer.alloc(0)
+  let tinted = bitmap
+  if (opts.tint) tinted = recolorBitmap(bitmap, themeGlyphColor())
+  if (opts.dot) tinted = overlayDotOnBitmap(tinted, size, size, opts.dot)
+  return nativeImage.createFromBitmap(tinted, { width: size, height: size }).toPNG()
+}
+
+/** Multi-resolution tray image: the brand mark, optionally theme-tinted + status dot. */
+function brandMarkImage(opts: { tint?: boolean; dot?: StatusColor | null } = {}): Electron.NativeImage {
+  const img = nativeImage.createEmpty()
+  for (const size of [16, 32] as const) {
+    const png = brandMarkRep(size, opts)
+    if (png.length === 0) continue
+    img.addRepresentation({ scaleFactor: size / 16, width: size, height: size, buffer: png })
+  }
+  return img
 }
 
 const TASK_NAME = 'ClarityStartup'
@@ -330,76 +369,242 @@ async function applyAutoLaunch(enabled: boolean): Promise<void> {
   }
 }
 
+// ─── Tray ─────────────────────────────────────────────────
+const TRAY_REFRESH_MS = 60_000
+
+let trayRefreshTimer: ReturnType<typeof setInterval> | null = null
+let quickScanInFlight = false
+let lastTrayFingerprint = ''
+let lastStatusColor: StatusColor | null = null
+
+/** Routes the tray can jump to. The renderer validates them again on receipt. */
+const TRAY_NAV_ITEMS: { route: string; icon: MenuIconName; labelKey: string }[] = [
+  { route: '/', icon: 'home', labelKey: 'trayOpenDashboard' },
+  { route: '/cleaner', icon: 'eraser', labelKey: 'trayOpenCleaner' },
+  { route: '/malware', icon: 'bug', labelKey: 'trayOpenMalware' },
+  { route: '/performance', icon: 'gauge', labelKey: 'trayOpenPerformance' },
+  { route: '/settings', icon: 'sliders', labelKey: 'trayOpenSettings' },
+]
+
+function showMainWindow(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  } else {
+    createWindow()
+  }
+}
+
+function navigateFromTray(route: string): void {
+  showMainWindow()
+  const win = mainWindow
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC.TRAY_NAVIGATE, route)
+  }
+}
+
+async function runTrayQuickScan(): Promise<void> {
+  if (quickScanInFlight) return
+  quickScanInFlight = true
+  refreshTrayMenu()
+  try {
+    const results = await runSystemScan(() => mainWindow)
+    const totalSize = results.reduce((s, r) => s + r.totalSize, 0)
+    const itemCount = results.reduce((s, r) => s + r.itemCount, 0)
+    notifyScheduledScanComplete(totalSize, itemCount)
+  } catch (err) {
+    console.error('Tray quick scan failed:', err)
+  } finally {
+    quickScanInFlight = false
+    refreshTrayMenu()
+  }
+}
+
+async function runTrayRestorePoint(): Promise<void> {
+  const result = await createRestorePoint('Clarity tray restore point')
+  if (Notification.isSupported()) {
+    new Notification({
+      title: t(result.success ? 'trayRestorePointOkTitle' : 'trayRestorePointFailTitle'),
+      body: result.success
+        ? t('trayRestorePointOkBody')
+        : t('trayRestorePointFailBody', { error: result.error ?? '' }),
+      silent: true
+    }).show()
+  }
+}
+
+function formatNextScan(date: Date): string {
+  const lang = getSettings().language || 'en'
+  const now = new Date()
+  const time = new Intl.DateTimeFormat(lang, { hour: 'numeric', minute: '2-digit' }).format(date)
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  if (sameDay) return `${t('trayToday')} ${time}`
+  return new Intl.DateTimeFormat(lang, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(date)
+}
+
+interface TrayStatus {
+  nextScanLabel: string | null
+  alerts: number
+  threats: number
+  showThreatNotifications: boolean
+  scheduleEnabled: boolean
+}
+
+function readTrayStatus(): TrayStatus {
+  const settings = getSettings()
+  const next = getNextScanTime(settings)
+  const snapshot = threatMonitor.getThreatSnapshot()
+  return {
+    nextScanLabel: next ? formatNextScan(next) : null,
+    alerts: alertMonitor.getHistory().length,
+    threats: snapshot ? snapshot.flaggedConnections.length + snapshot.flaggedDns.length : 0,
+    showThreatNotifications: settings.showThreatNotifications,
+    scheduleEnabled: hasEnabledSchedules(settings),
+  }
+}
+
+function trayFingerprint(s: TrayStatus): string {
+  return [s.nextScanLabel, s.alerts, s.threats, s.showThreatNotifications, s.scheduleEnabled, quickScanInFlight].join('|')
+}
+
+function statusColorFor(s: TrayStatus): StatusColor | null {
+  if (s.threats > 0 || s.alerts > 0) return 'red'
+  if (s.scheduleEnabled || s.nextScanLabel) return 'amber'
+  return null
+}
+
+function buildTrayContextMenu(s: TrayStatus): Electron.Menu {
+  const statusSubmenu: Electron.MenuItemConstructorOptions[] = [
+    s.nextScanLabel
+      ? { label: `${t('trayNextScan')}: ${s.nextScanLabel}`, enabled: false }
+      : { label: t('trayNoSchedule'), enabled: false },
+    { label: `${t('trayAlerts')}: ${s.alerts}`, enabled: false },
+    { label: `${t('trayThreatFlags')}: ${s.threats}`, enabled: false },
+    { type: 'separator' },
+    {
+      label: t('trayThreatNotifications'),
+      type: 'checkbox',
+      checked: s.showThreatNotifications,
+      click: (item) => setSettings({ showThreatNotifications: item.checked }),
+    },
+  ]
+
+  const win32 = process.platform === 'win32'
+
+  return Menu.buildFromTemplate([
+    { label: t('openClarity'), icon: menuGlyphImage('home'), click: showMainWindow },
+    { type: 'separator' },
+    {
+      label: t('trayQuickScan'),
+      icon: menuGlyphImage('quickScan'),
+      enabled: !quickScanInFlight,
+      click: () => { void runTrayQuickScan() },
+    },
+    {
+      label: t('trayRunScheduledScan'),
+      icon: menuGlyphImage('play'),
+      enabled: s.scheduleEnabled,
+      click: () => { runSoonestScheduleNow(() => mainWindow) },
+    },
+    ...(win32 ? [{
+      label: t('trayRestorePoint'),
+      icon: menuGlyphImage('restorePoint'),
+      click: () => { void runTrayRestorePoint() },
+    }] : []),
+    { type: 'separator' },
+    {
+      label: t('trayStatus'),
+      icon: menuGlyphImage('activity'),
+      submenu: statusSubmenu,
+    },
+    {
+      label: t('trayOpenMenu'),
+      icon: menuGlyphImage('sliders'),
+      submenu: TRAY_NAV_ITEMS.map((item) => ({
+        label: t(item.labelKey),
+        icon: menuGlyphImage(item.icon),
+        click: () => navigateFromTray(item.route),
+      })),
+    },
+    { type: 'separator' },
+    { label: t('quit'), icon: menuGlyphImage('power'), click: () => app.quit() },
+  ])
+}
+
+/**
+ * Tray icon variant with a colored status dot (red = attention, amber = active).
+ * The base mark is re-tinted to the current theme first — the dot variant has to
+ * be a regular (non-template) image, and a raw black template mark would vanish
+ * on a dark menu bar.
+ */
+function createStatusTrayIcon(color: StatusColor): Electron.NativeImage {
+  const img = brandMarkImage({ tint: true, dot: color })
+  if (process.platform === 'darwin') img.setTemplateImage(false)
+  return img
+}
+
+function updateTrayStatusIcon(): void {
+  if (!tray) return
+  const color = statusColorFor(readTrayStatus())
+  if (color === lastStatusColor) return
+  lastStatusColor = color
+  if (!color) {
+    tray.setImage(createTrayIcon())
+    return
+  }
+  tray.setImage(createStatusTrayIcon(color))
+}
+
+/**
+ * Rebuild the tray context menu only when something it displays actually
+ * changed, so an open menu isn't closed on a fixed 60s cadence for no reason.
+ */
+function refreshTrayMenu(): void {
+  if (!tray) return
+  const status = readTrayStatus()
+  const fp = trayFingerprint(status)
+  if (fp === lastTrayFingerprint) return
+  lastTrayFingerprint = fp
+  tray.setToolTip(t('trayTooltip'))
+  tray.setContextMenu(buildTrayContextMenu(status))
+  updateTrayStatusIcon()
+}
+
 function createTray(): void {
   if (tray) return
 
   tray = new Tray(createTrayIcon())
   tray.setToolTip(t('trayTooltip'))
+  tray.setContextMenu(buildTrayContextMenu(readTrayStatus()))
+  tray.on('double-click', showMainWindow)
+  lastTrayFingerprint = trayFingerprint(readTrayStatus())
 
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: t('openClarity'),
-      click: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.show()
-          mainWindow.focus()
-        } else {
-          createWindow()
-        }
-      }
-    },
-    { type: 'separator' },
-    {
-      label: t('quit'),
-      click: () => {
-        app.quit()
-      }
-    }
-  ])
-
-  tray.setContextMenu(contextMenu)
-  tray.on('double-click', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show()
-      mainWindow.focus()
-    } else {
-      createWindow()
-    }
-  })
+  // Keep "next scan", alert counts and the icon status dot current while running
+  trayRefreshTimer = setInterval(refreshTrayMenu, TRAY_REFRESH_MS)
 }
 
-/** Rebuild the tray context menu (e.g. after a language change) */
+/** Force a full tray rebuild (e.g. after a language change). */
 function rebuildTrayMenu(): void {
-  if (!tray) return
-  tray.setToolTip(t('trayTooltip'))
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: t('openClarity'),
-      click: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.show()
-          mainWindow.focus()
-        } else {
-          createWindow()
-        }
-      }
-    },
-    { type: 'separator' },
-    {
-      label: t('quit'),
-      click: () => {
-        app.quit()
-      }
-    }
-  ])
-  tray.setContextMenu(contextMenu)
+  lastTrayFingerprint = ''
+  lastStatusColor = null
+  refreshTrayMenu()
 }
 
 function destroyTray(): void {
+  if (trayRefreshTimer) {
+    clearInterval(trayRefreshTimer)
+    trayRefreshTimer = null
+  }
   if (tray) {
     tray.destroy()
     tray = null
   }
+  lastTrayFingerprint = ''
+  lastStatusColor = null
 }
 
 function createWindow(): void {

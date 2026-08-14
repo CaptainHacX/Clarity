@@ -9,7 +9,7 @@ vi.mock('./settings-store', () => ({ getSettings: () => ({}), setSettings: () =>
 vi.mock('./history-store', () => ({ getHistory: () => [] }))
 vi.mock('./logger', () => ({ logInfo: () => {}, logError: () => {} }))
 
-import { getNextScanTime, getNextRunTime, isSameDay } from './scheduler'
+import { getNextScanTime, getNextRunTime, isSameDay, getSoonestScheduleEntry, hasEnabledSchedules } from './scheduler'
 import type { ClaritySettings, ScheduleEntry } from '../../shared/types'
 
 function makeSettings(
@@ -238,5 +238,63 @@ describe('getNextRunTime', () => {
     vi.setSystemTime(new Date('2025-02-01T07:00:00'))
     const result = getNextRunTime(makeEntry({ frequency: 'monthly', day: 31, hour: 9 }))!
     expect(result.getDate()).toBeLessThanOrEqual(28)
+  })
+})
+
+// ─── Tray helpers ─────────────────────────────────────────
+
+describe('hasEnabledSchedules', () => {
+  it('is false when nothing is enabled', () => {
+    const settings = makeSettings({ enabled: false })
+    settings.schedules = []
+    expect(hasEnabledSchedules(settings)).toBe(false)
+  })
+
+  it('is true when the legacy schedule is enabled', () => {
+    expect(hasEnabledSchedules(makeSettings({ enabled: true }))).toBe(true)
+  })
+
+  it('is true when any multi-schedule entry is enabled even if legacy is off', () => {
+    const settings = makeSettings({ enabled: false })
+    settings.schedules = [
+      makeEntry({ id: 'a', enabled: true }),
+      makeEntry({ id: 'b', enabled: false }),
+    ]
+    expect(hasEnabledSchedules(settings)).toBe(true)
+  })
+})
+
+describe('getSoonestScheduleEntry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns null when no schedule is active', () => {
+    const settings = makeSettings({ enabled: false })
+    settings.schedules = []
+    expect(getSoonestScheduleEntry(settings)).toBeNull()
+  })
+
+  it('returns the enabled entry that fires soonest', () => {
+    vi.setSystemTime(new Date('2025-06-15T07:00:00'))
+    const settings = makeSettings({ enabled: false })
+    settings.schedules = [
+      makeEntry({ id: 'late', frequency: 'daily', hour: 20 }),
+      makeEntry({ id: 'soon', frequency: 'daily', hour: 10 }),
+      makeEntry({ id: 'off', enabled: false, frequency: 'daily', hour: 8 }),
+    ]
+    expect(getSoonestScheduleEntry(settings)?.id).toBe('soon')
+  })
+
+  it('falls back to the legacy schedule entry when multi-schedule is empty', () => {
+    vi.setSystemTime(new Date('2025-06-15T07:00:00'))
+    const settings = makeSettings({ enabled: true, frequency: 'daily', hour: 9 })
+    const entry = getSoonestScheduleEntry(settings)
+    expect(entry).not.toBeNull()
+    expect(entry!.id).toBe('legacy')
   })
 })

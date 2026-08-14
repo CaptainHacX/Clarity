@@ -301,6 +301,13 @@ const api = {
     return () => { ipcRenderer.removeListener(IPC.HISTORY_CHANGED, handler) }
   },
 
+  // Tray navigation — the tray asks the window to open a route
+  onTrayNavigate: (callback: (route: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, route: string) => callback(route)
+    ipcRenderer.on(IPC.TRAY_NAVIGATE, handler)
+    return () => { ipcRenderer.removeListener(IPC.TRAY_NAVIGATE, handler) }
+  },
+
   // Privacy Shield
   privacyScan: (): Promise<PrivacyShieldState> => ipcRenderer.invoke(IPC.PRIVACY_SCAN),
   privacyApply: (ids: string[]): Promise<PrivacyApplyResult> =>

@@ -577,8 +577,8 @@ function ScanDetailPopup({ entry, onClose }: { entry: ScanHistoryEntry; onClose:
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={onClose} />
       <div
-        className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto animate-scale-in rounded-2xl p-6"
-        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-medium)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}
+        className="glass-card relative max-h-[85vh] w-full max-w-2xl overflow-y-auto animate-scale-in rounded-2xl p-6"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-medium)', boxShadow: '0 24px 80px var(--modal-shadow)' }}
       >
         {/* Header */}
         <div className="mb-5 flex items-center gap-3">

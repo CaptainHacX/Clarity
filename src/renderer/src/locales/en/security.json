@@ -113,7 +113,12 @@
   "customAdd": "Add",
   "customRemove": "Remove",
   "customInvalid": "Enter a port between 1 and 65535.",
+  "customDuplicate": "Port {{port}} is already monitored.",
+  "customAdded": "Port {{port}} added",
+  "customRemoved": "Port removed",
+  "customMonitored": "Monitored",
   "settingsSaved": "Settings saved",
+  "intervalInactive": "Requires scheduled scans to be on",
   "scanFailed": "Scan failed",
   "kind": {
     "computer": "Computer",

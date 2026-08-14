@@ -79,7 +79,7 @@ export function ConfirmDialog({
         className="glass-card relative w-full max-w-md animate-scale-in rounded-2xl p-6"
         style={{
           background: 'var(--card-bg)',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 var(--glass-inset)'
+          boxShadow: '0 24px 80px var(--modal-shadow), inset 0 1px 0 var(--glass-inset)'
         }}
       >
         <div className="mb-5 flex items-start gap-4">

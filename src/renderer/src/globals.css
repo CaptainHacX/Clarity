@@ -133,6 +133,18 @@
   --glass-hover-inset: rgba(255, 255, 255, 0.05);
   --glass-hover-shadow: 0 8px 40px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.12);
 
+  /* Layered shadows (color components swapped per theme) */
+  --modal-shadow: rgba(0, 0, 0, 0.5);
+  --panel-shadow: rgba(0, 0, 0, 0.4);
+  --flyout-shadow: rgba(0, 0, 0, 0.35);
+  --toast-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 var(--glass-inset);
+
+  /* Glass blur (used by the light theme only) */
+  --glass-blur: 12px;
+  --glass-blur-lg: 16px;
+  --glass-sat: 140%;
+  --glass-sat-hover: 150%;
+
   /* Scrollbar */
   --scrollbar-thumb: rgba(255,255,255,0.06);
   --scrollbar-thumb-hover: rgba(255,255,255,0.12);
@@ -143,24 +155,30 @@
   /* Ambient glows */
   --glow-amber: rgba(245,158,11,0.025);
   --glow-blue: rgba(59,130,246,0.02);
+  --glow-rose: transparent;
 }
 
 .light {
-  /* Page */
-  --page-bg: #f4f4f6;
-  --sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f8f8fa 100%);
+  /* Page — aurora-style color fields so the frosted panels have depth to diffuse */
+  --page-bg:
+    radial-gradient(1400px 900px at 88% -12%, rgba(245, 158, 11, 0.20), transparent 62%),
+    radial-gradient(1300px 850px at -8% 112%, rgba(59, 130, 246, 0.18), transparent 62%),
+    radial-gradient(900px 620px at 115% 65%, rgba(236, 72, 153, 0.08), transparent 58%),
+    radial-gradient(760px 520px at -6% 18%, rgba(251, 191, 36, 0.12), transparent 60%),
+    #f6f5f3;
+  --sidebar-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.70) 0%, rgba(250, 250, 253, 0.56) 100%);
 
-  /* Surfaces */
-  --card-bg: #ffffff;
+  /* Surfaces — translucent so the light theme reads as frosted glass */
+  --card-bg: rgba(255, 255, 255, 0.62);
   --bg-subtle: rgba(0,0,0,0.025);
   --bg-subtle-2: rgba(0,0,0,0.035);
   --bg-hover: rgba(0,0,0,0.04);
   --bg-hover-2: rgba(0,0,0,0.06);
   --bg-active: rgba(0,0,0,0.08);
-  --bg-elevated: #f0f0f4;
-  --bg-overlay: #e4e4e8;
-  --flyout-bg: rgba(255, 255, 255, 0.96);
-  --toast-bg: rgba(255, 255, 255, 0.95);
+  --bg-elevated: rgba(255, 255, 255, 0.58);
+  --bg-overlay: rgba(255, 255, 255, 0.64);
+  --flyout-bg: rgba(255, 255, 255, 0.74);
+  --toast-bg: rgba(255, 255, 255, 0.78);
 
   /* Text */
   --text-primary: #1a1a2e;
@@ -197,14 +215,20 @@
   --grid-line: rgba(0, 0, 0, 0.06);
 
   /* Glass */
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(0, 0, 0, 0.08);
-  --glass-inset: rgba(255, 255, 255, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.52);
+  --glass-border: rgba(0, 0, 0, 0.09);
+  --glass-inset: rgba(255, 255, 255, 0.9);
   --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --glass-hover-bg: rgba(255, 255, 255, 0.85);
-  --glass-hover-border: rgba(0, 0, 0, 0.12);
-  --glass-hover-inset: rgba(255, 255, 255, 0.9);
+  --glass-hover-bg: rgba(255, 255, 255, 0.66);
+  --glass-hover-border: rgba(0, 0, 0, 0.13);
+  --glass-hover-inset: rgba(255, 255, 255, 0.95);
   --glass-hover-shadow: 0 8px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* Layered shadows — soft, cool-toned for daylight */
+  --modal-shadow: rgba(31, 41, 55, 0.16);
+  --panel-shadow: rgba(31, 41, 55, 0.15);
+  --flyout-shadow: rgba(31, 41, 55, 0.14);
+  --toast-shadow: 0 8px 32px rgba(31, 41, 55, 0.12), inset 0 1px 0 var(--glass-inset);
 
   /* Scrollbar */
   --scrollbar-thumb: rgba(0,0,0,0.10);
@@ -213,10 +237,16 @@
   /* Selection */
   --selection-bg: rgba(217, 119, 6, 0.20);
 
-  /* Ambient glows — disabled in light mode */
-  --glow-amber: transparent;
-  --glow-blue: transparent;
+  /* Ambient glows — visible aurora fields in light mode */
+  --glow-amber: rgba(245, 158, 11, 0.20);
+  --glow-blue: rgba(59, 130, 246, 0.18);
+  --glow-rose: rgba(236, 72, 153, 0.10);
 }
+
+/* Film grain — invisible in dark, faint in light so the frosted panels
+   show a sharp→blurred contrast at their edges (see AppShell). */
+.app-grain { opacity: 0; }
+.light .app-grain { opacity: 0.06; }
 
 /* ── accessibility ───────────────────────────── */
 :focus-visible {
@@ -378,3 +408,186 @@ summary, .clickable { cursor: pointer; }
 .light .text-zinc-50 { color: var(--text-primary); }
 .light .placeholder\:text-zinc-700::placeholder { color: #a1a1aa; }
 .light .bg-white { background: white; }
+
+/* ── Light Liquid Glass ─────────────────────────
+   Applies ONLY to the effective light theme (`.light` on <html>); the
+   dark theme keeps its solid surfaces untouched. Panels stay translucent
+   even without backdrop support (@supports fallback), and backdrop blur
+   only kicks in where the browser supports it. A diagonal sheen + crisp
+   inner highlights give the panels their "glass rim"; the aurora + grain
+   behind them (see AppShell) is what the blur diffracts. */
+.light .glass-card {
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.05) 42%, rgba(255, 255, 255, 0.16) 100%),
+    var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.30),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
+    var(--glass-shadow);
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.light .glass-card-hover,
+.light .glass-card-hover:hover {
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.light .glass-card-hover:hover {
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.46) 0%, rgba(255, 255, 255, 0.08) 42%, rgba(255, 255, 255, 0.24) 100%),
+    var(--glass-hover-bg);
+  border-color: var(--glass-hover-border);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.38),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    var(--glass-hover-shadow);
+}
+
+.light .glow-amber:hover {
+  box-shadow:
+    inset 0 1px 0 0 rgba(245, 158, 11, 0.05),
+    0 0 30px rgba(245, 158, 11, 0.10),
+    0 8px 40px rgba(31, 41, 55, 0.10);
+}
+.light .glow-blue:hover {
+  box-shadow:
+    inset 0 1px 0 0 rgba(59, 130, 246, 0.05),
+    0 0 30px rgba(59, 130, 246, 0.10),
+    0 8px 40px rgba(31, 41, 55, 0.10);
+}
+.light .glow-green:hover {
+  box-shadow:
+    inset 0 1px 0 0 rgba(34, 197, 94, 0.05),
+    0 0 30px rgba(34, 197, 94, 0.10),
+    0 8px 40px rgba(31, 41, 55, 0.10);
+}
+
+/* Sidebar frost. backdrop-filter lives on .sidebar-glass, a positioned
+   sibling BEHIND the <nav> — never on .sidebar-shell or <nav>, because a
+   backdrop-filtered (or transformed) ancestor becomes the containing block
+   for the {position:fixed} flyout menus and clips them inside the
+   overflow-y-auto <nav>. The shell and nav are only position:relative
+   (z-index auto), which does NOT contain fixed descendants, so the flyouts
+   keep escaping to the viewport and keep their normal z-order. */
+.sidebar-glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.light .sidebar-shell {
+  background: var(--sidebar-bg);
+  border-right-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset -1px 0 0 0 rgba(255, 255, 255, 0.30);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.light [data-sonner-toast] {
+  background: var(--toast-bg);
+  border-color: var(--border-medium);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .light .glass-card {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  }
+  .light .glass-card-hover:hover {
+    -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-sat-hover));
+    backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-sat-hover));
+  }
+  .light .sidebar-glass {
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
+  }
+  .light [data-sonner-toast] {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .light .glass-card,
+  .light .glass-card-hover:hover,
+  .light .sidebar-glass,
+  .light [data-sonner-toast] {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+}
+
+/* ── settings: threshold slider ──────────────────── */
+.setting-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--fill, 0%),
+    var(--bg-active) var(--fill, 0%),
+    var(--bg-active) 100%
+  );
+  outline: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.setting-slider:focus-visible {
+  outline: 2px solid rgba(245, 158, 11, 0.6);
+  outline-offset: 3px;
+}
+.setting-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 15px;
+  width: 15px;
+  border-radius: 50%;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.setting-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+.light .setting-slider::-webkit-slider-thumb {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.setting-slider::-moz-range-thumb {
+  height: 15px;
+  width: 15px;
+  border-radius: 50%;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.setting-slider:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.setting-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+/* ── settings: focus ring for search results ────── */
+@keyframes setting-highlight {
+  0% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55); }
+  100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0); }
+}
+.setting-highlight {
+  animation: setting-highlight 1.6s ease-out 2;
+  border-radius: 14px;
+}

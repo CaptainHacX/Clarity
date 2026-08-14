@@ -40,6 +40,8 @@ import {
   Lock,
   FileText,
   ShieldCheck,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
@@ -51,6 +53,7 @@ import { useDriverStore } from '@/stores/driver-store'
 import { useGameModeStore } from '@/stores/game-mode-store'
 import { useCveStore } from '@/stores/cve-store'
 import { usePlatform } from '@/hooks/usePlatform'
+import { useSettingsStore } from '@/stores/settings-store'
 
 interface SubItemDef {
   icon: LucideIcon
@@ -248,12 +251,18 @@ export function Sidebar() {
 
   return (
     <div
-      className="flex h-full w-[240px] shrink-0 flex-col"
+      className="sidebar-shell relative flex h-full w-[240px] shrink-0 flex-col"
       style={{
         background: 'var(--sidebar-bg)',
         borderRight: '1px solid var(--border-medium)'
       }}
     >
+      {/* Frost layer. backdrop-filter lives here (NOT on .sidebar-shell): a
+          backdrop-filtered ancestor becomes the containing block for the
+          {position:fixed} flyout menus and clips them inside the overflowing
+          <nav>. As a sibling behind the nav it stays out of the flyout
+          subtree. */}
+      <div className="sidebar-glass" aria-hidden="true" />
       {/* Logo — doubles as drag region */}
       <div className="drag-region relative flex items-center gap-3 px-5 pb-4 pt-5">
         <div
@@ -270,7 +279,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav items */}
-      <nav className="mt-1 min-h-0 flex-1 overflow-y-auto px-3" aria-label={t('mainNavigation', 'Main navigation')}>
+      <nav className="relative mt-1 min-h-0 flex-1 overflow-y-auto px-3" aria-label={t('mainNavigation', 'Main navigation')}>
         {filteredNavGroups.map((group, gi) => (
           <div key={gi} className={gi > 0 ? 'mt-5' : ''} role={group.headingKey ? 'group' : undefined} aria-labelledby={group.headingKey ? `nav-group-${gi}` : undefined}>
             {group.headingKey && (
@@ -317,19 +326,77 @@ function BottomNav({ submenuProps, openSubmenu, isPathActive, badgeCounts }: {
   const bottomNavItems = useBottomNavItems()
 
   return (
-    <div className="px-3 pb-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-      {bottomNavItems.map((item) => (
-        <NavItem
-          key={item.path}
-          item={item}
-          badgeCount={badgeCounts[item.path]}
-          badgeCounts={badgeCounts}
-          isActive={isPathActive(item)}
-          submenuOpen={openSubmenu === item.path}
-          {...submenuProps}
-        />
-      ))}
+    <div className="relative px-3 pb-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-[4]">
+          {bottomNavItems.map((item) => (
+            <NavItem
+              key={item.path}
+              item={item}
+              badgeCount={badgeCounts[item.path]}
+              badgeCounts={badgeCounts}
+              isActive={isPathActive(item)}
+              submenuOpen={openSubmenu === item.path}
+              {...submenuProps}
+            />
+          ))}
+        </div>
+        <div className="flex flex-1 self-stretch">
+          <ThemeToggle />
+        </div>
+      </div>
     </div>
+  )
+}
+
+/**
+ * Fast dark/light switch pinned to the bottom of the sidebar. The theme can be
+ * "system" (follows the OS), so the icon/label always show the *target* mode —
+ * Sun when dark (tap for light), Moon when light (tap for dark) — and toggling
+ * from "system" simply pins the choice explicitly.
+ */
+function ThemeToggle() {
+  const { t } = useTranslation('sidebar')
+  const theme = useSettingsStore((s) => s.settings.theme)
+  const updateSettings = useSettingsStore((s) => s.updateSettings)
+  const [systemDark, setSystemDark] = useState(false)
+
+  // Resolve what the OS would pick when theme is "system".
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    setSystemDark(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  const isDark = theme === 'system' ? systemDark : theme === 'dark'
+
+  const handleToggle = () => {
+    const next: 'dark' | 'light' = isDark ? 'light' : 'dark'
+    updateSettings({ theme: next })
+    window.clarity?.settingsSet?.({ theme: next }).catch(() => {})
+  }
+
+  const Icon = isDark ? Sun : Moon
+  const label = t(isDark ? 'themeToggleLight' : 'themeToggleDark')
+
+  return (
+    <button
+      onClick={handleToggle}
+      aria-pressed={isDark}
+      aria-label={label}
+      title={label}
+      className="group flex h-full w-full items-center justify-center rounded-lg transition-all duration-200 hover:bg-[var(--bg-hover)]"
+      style={{ color: 'var(--text-muted)' }}
+    >
+      <Icon
+        key={isDark ? 'sun' : 'moon'}
+        className="h-[16px] w-[16px] animate-fade-in transition-colors duration-200 group-hover:text-amber-400"
+        strokeWidth={1.8}
+        aria-hidden="true"
+      />
+    </button>
   )
 }
 
@@ -521,7 +588,7 @@ function FlyoutMenu({ buttonRef, popoverRef, items, badgeCounts, onSelect, onClo
         className="glass-card w-56 rounded-xl py-1.5"
         style={{
           background: 'var(--flyout-bg)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.4), inset 0 1px 0 var(--glass-inset)'
+          boxShadow: '0 12px 40px var(--panel-shadow), inset 0 1px 0 var(--glass-inset)'
         }}
       >
         {items.map((child) => {

@@ -197,6 +197,64 @@ export function runScheduleNow(scheduleId: string, getMainWindow: () => BrowserW
   return true
 }
 
+// ─── Tray helpers ─────────────────────────────────────────
+
+/** All enabled schedules, including the legacy single-schedule as a synthetic entry. */
+function getEnabledScheduleEntries(settings: ClaritySettings): ScheduleEntry[] {
+  const entries = settings.schedules.filter((s) => s.enabled)
+  if (entries.length > 0) return entries
+
+  if (settings.schedule.enabled) {
+    return [{
+      id: 'legacy',
+      name: t('scheduledScanName'),
+      enabled: true,
+      frequency: settings.schedule.frequency,
+      day: settings.schedule.day,
+      hour: settings.schedule.hour,
+      minute: 0,
+      tasks: [],
+      autoApply: false,
+      lastRunAt: null,
+      lastRunStatus: 'never',
+      createdAt: ''
+    }]
+  }
+  return []
+}
+
+/**
+ * The enabled schedule that fires soonest, or null when no schedule is active.
+ * Used by the tray to render a "Run scheduled scan" action.
+ */
+export function getSoonestScheduleEntry(settings: ClaritySettings): ScheduleEntry | null {
+  let soonest: ScheduleEntry | null = null
+  for (const entry of getEnabledScheduleEntries(settings)) {
+    const next = getNextRunTime(entry)
+    if (!next) continue
+    if (!soonest || next < getNextRunTime(soonest)!) {
+      soonest = entry
+    }
+  }
+  return soonest
+}
+
+/** True when at least one schedule is enabled (multi or legacy). */
+export function hasEnabledSchedules(settings: ClaritySettings): boolean {
+  return getEnabledScheduleEntries(settings).length > 0
+}
+
+/**
+ * Run whichever enabled schedule is due soonest right now.
+ * Returns false when no schedule is active.
+ */
+export function runSoonestScheduleNow(getMainWindow: () => BrowserWindow | null): boolean {
+  const entry = getSoonestScheduleEntry(getSettings())
+  if (!entry) return false
+  triggerScheduleEntry(getMainWindow(), entry)
+  return true
+}
+
 /**
  * Send a notification when a scheduled scan completes.
  */

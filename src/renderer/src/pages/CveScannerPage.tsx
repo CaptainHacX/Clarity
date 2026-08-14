@@ -516,7 +516,7 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
         style={{
           background: 'var(--card-bg)',
           borderLeft: '1px solid var(--border-medium)',
-          boxShadow: '-24px 0 64px rgba(0,0,0,0.4)'
+          boxShadow: '-24px 0 64px var(--panel-shadow)'
         }}
       >
         {/* Header */}

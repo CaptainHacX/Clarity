@@ -26,6 +26,8 @@
   "portManager": "Port Manager",
   "history": "History",
   "settings": "Settings",
+  "themeToggleLight": "Switch to light mode",
+  "themeToggleDark": "Switch to dark mode",
   "gameMode": "Game Mode",
   "systemHealthReport": "System Health Report"
 }

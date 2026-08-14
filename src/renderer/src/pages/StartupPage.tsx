@@ -113,15 +113,16 @@ function Toggle({ enabled, pending, onToggle, label }: { enabled: boolean; pendi
       disabled={pending}
       onClick={onToggle}
       className={cn(
-        'relative h-[26px] w-[48px] shrink-0 rounded-full transition-colors duration-200 disabled:cursor-wait',
+        'relative h-[26px] w-[48px] shrink-0 rounded-full transition-colors duration-200 disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]',
         enabled ? 'bg-gradient-to-r from-amber-500 to-amber-400' : ''
       )}
       style={enabled ? { boxShadow: '0 0 14px rgba(245,158,11,0.25)' } : { background: 'var(--bg-active)' }}
     >
       <span
+        aria-hidden="true"
         className={cn(
-          'absolute top-[3px] flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-200',
-          enabled ? 'translate-x-[25px]' : 'translate-x-[3px]'
+          'absolute top-[3px] flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-[left] duration-200',
+          enabled ? 'left-[25px]' : 'left-[3px]'
         )}
       >
         {pending && <Loader2 className="h-3 w-3 animate-spin text-amber-500" strokeWidth={2.5} aria-hidden="true" />}
@@ -229,7 +230,7 @@ function DetailsModal({ item, onClose }: { item: StartupItem; onClose: () => voi
         aria-modal="true"
         aria-labelledby="startup-details-title"
         className="glass-card relative w-full max-w-lg animate-scale-in overflow-hidden rounded-2xl"
-        style={{ background: 'var(--card-bg)', boxShadow: '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 var(--glass-inset)' }}
+        style={{ background: 'var(--card-bg)', boxShadow: '0 24px 80px var(--modal-shadow), inset 0 1px 0 var(--glass-inset)' }}
       >
         <div className="flex items-start gap-4 px-6 pt-6 pb-5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-[15px] font-bold" style={{ background: cfg.bg, color: cfg.text }} aria-hidden="true">

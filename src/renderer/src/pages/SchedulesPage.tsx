@@ -534,11 +534,11 @@ function PresetPicker({
       />
       <div
         ref={panelRef}
-        className="relative max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl"
+        className="glass-card relative max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl"
         style={{
           background: 'var(--card-bg)',
           border: '1px solid var(--glass-border)',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 var(--glass-inset)',
+          boxShadow: '0 24px 80px var(--modal-shadow), inset 0 1px 0 var(--glass-inset)',
         }}
       >
         {/* Header */}
@@ -833,11 +833,11 @@ function ScheduleDialog({
       />
       <div
         ref={panelRef}
-        className="relative max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl"
+        className="glass-card relative max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl"
         style={{
           background: 'var(--card-bg)',
           border: '1px solid var(--glass-border)',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 var(--glass-inset)',
+          boxShadow: '0 24px 80px var(--modal-shadow), inset 0 1px 0 var(--glass-inset)',
         }}
       >
         <div className="flex items-center justify-between p-6 pb-4">
@@ -1182,13 +1182,14 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      className="relative h-[26px] w-[46px] shrink-0 cursor-pointer rounded-full transition-colors duration-200"
+      className="relative h-[26px] w-[46px] shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       style={{ background: checked ? 'var(--accent)' : 'var(--bg-active)' }}
     >
       <div
+        aria-hidden="true"
         className={cn(
-          'absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200',
-          checked ? 'translate-x-[22px]' : 'translate-x-[3px]'
+          'absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-[left] duration-200',
+          checked ? 'left-[23px]' : 'left-[3px]'
         )}
       />
     </button>
