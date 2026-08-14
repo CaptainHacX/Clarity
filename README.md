@@ -85,8 +85,9 @@ Grab the latest installer for your platform from [GitHub Releases](https://githu
 > ```
 >
 > Windows releases are held until signing is configured (unsigned installers trigger
-> SmartScreen, which we won't ship). See [WINDOWS_SIGNING.md](WINDOWS_SIGNING.md) — once
-> set up, the installer you download is signed and SmartScreen-clean.
+> SmartScreen, which we won't ship). Signing is **free** via SignPath Foundation — see
+> [WINDOWS_SIGNING.md](WINDOWS_SIGNING.md). Once set up, the installer you download is
+> signed and SmartScreen-clean.
 
 ## Why Clarity?
 

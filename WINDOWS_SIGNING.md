@@ -1,177 +1,175 @@
-# Windows Code Signing Setup (Azure Trusted Signing / Artifact Signing)
+# Windows Code Signing Setup (SignPath Foundation)
 
 Clarity's Windows releases are **hard-blocked until signing is configured** — the release
 workflow refuses to build an unsigned installer (SmartScreen would flag it with the
-"Windows protected your PC" dialog, which is a trust-killer for downloads). This document
-walks you through enabling real signing via Microsoft's **Azure Trusted Signing** service
-(renamed **Azure Artifact Signing** in 2026).
+"Windows protected your PC" dialog). This document walks you through enabling real signing
+for free via **SignPath Foundation**.
 
-Once configured, everything is automatic: pushing a `v*` tag produces a **signed
-installer** on the GitHub release.
+Once configured, everything is automatic: pushing a `v*` tag builds the installer, submits
+it to SignPath, and attaches the **signed installer** to the GitHub release.
 
-## Cost & eligibility (read this first)
+## Why SignPath Foundation (instead of Azure)
 
-| Item | Detail |
-|---|---|
-| Cost | **$9.99/month** (Basic) for up to 5,000 signatures, then $0.005/signature. Premium: $99.99/mo for 100,000. |
-| What you need | A Microsoft account + an Azure **Pay-As-You-Go** subscription. |
-| Eligibility | Identity validation is limited to **US / Canada / EU / UK** entities (individuals or organizations). If you're outside these regions, Trusted Signing won't accept you — you'd need a CA-issued code signing certificate instead. |
-| Identity check | Microsoft verifies your identity (name/organization) and it takes **hours to days**; it must be renewed yearly. |
-| Reputation | A standard (non-EV) signature removes most of SmartScreen's scariness but may still show a **one-time** "More info → Run anyway" on very first run until Windows builds reputation. Full clearance needs an EV certificate (~$100s/yr) or a track record of installs. |
+| Option | Cost | Notes |
+|---|---|---|
+| **SignPath Foundation** | **Free** | Certificate is issued to *SignPath Foundation* (not to you). Requires your project to be an eligible open-source project. |
+| Azure Trusted Signing / Artifact Signing | $9.99/month + paid Azure subscription | Signatures show *your* validated name. Microsoft explicitly does not support free/trial/sponsored Azure subscriptions. |
 
-If the monthly fee is a blocker, the same options from `SIGNING.md` apply: get added to an
-organization that already has a Trusted Signing account, or fund it via GitHub Sponsors.
+SignPath Foundation is a nonprofit that provides a code-signing certificate for
+qualifying open-source projects. The signature is a **real, Windows-trusted Authenticode
+signature** (Sectigo-issued), so it removes most SmartScreen warnings from day one — the
+certificate already carries reputation from projects like vim and flameshot. The only cost
+is that the **publisher name shows "SignPath Foundation"** rather than your name.
+
+## Eligibility (read first)
+
+- The project must be **open-source** with a publicly accessible repository (✓ Clarity is).
+- The project must have **already released software** in the form that needs signing
+  (✓ Clarity ships v1.0.x releases).
+- The functionality must be documented on the download page (✓ README covers this).
+- You must follow SignPath Foundation's **Code of Conduct**, and the software must not be
+  malicious or adware-bundled.
+- SignPath reserves the right to revoke the certificate if a project violates the Code of
+  Conduct (retroactive revocation). For a legitimate OSS project this is not a practical
+  concern.
 
 ## What you'll end up with
 
-**3 GitHub secrets** (credentials for a service principal the CI uses):
+**1 GitHub secret** (the API token SignPath's GitHub Action uses to submit signing requests):
 
-- `AZURE_TENANT_ID`
-- `AZURE_CLIENT_ID`
-- `AZURE_CLIENT_SECRET`
+- `SIGNPATH_API_TOKEN`
 
-**4 GitHub variables** (non-secret values that identify your Azure signing resources):
+**4 GitHub variables** (non-secret values identifying your SignPath project — the slugs you
+create in the SignPath dashboard):
 
-- `AZURE_SIGNING_ENDPOINT` — e.g. `https://eus.codesigning.azure.net`
-- `AZURE_SIGNING_ACCOUNT` — your **Trusted Signing account** name
-- `AZURE_SIGNING_PROFILE` — your **certificate profile** name
-- `AZURE_SIGNING_PUBLISHER` — the exact identity-validation name shown as the publisher
+- `SIGNPATH_ORGANIZATION_ID` — your SignPath organization ID
+- `SIGNPATH_PROJECT_SLUG` — your SignPath project slug
+- `SIGNPATH_SIGNING_POLICY_SLUG` — your signing policy slug (e.g. `release-signing`)
+- `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` — the artifact configuration that describes how to
+  sign the `.exe`
 
 ---
 
-## Step 1 — Create an Azure subscription
+## Step 1 — Apply to SignPath Foundation
 
-1. Go to https://azure.microsoft.com/free/ and sign up (or sign in if you have an account).
-2. Create a **Pay-As-You-Go** subscription. The free-trial credit is nice for other Azure
-   things, but **Trusted Signing itself is paid** — it's not covered by the free tier.
+1. Go to https://signpath.org/ and click **Apply**.
+2. Fill in the application with your repository URL and release info. Approval is not
+   instant — expect **days to weeks** (it's a human-reviewed process).
+3. Once approved, you'll get an account on the SignPath platform.
 
-## Step 2 — Create the Trusted Signing account
+## Step 2 — Install the SignPath GitHub App
 
-1. In the Azure portal, search for **"Trusted Signing Accounts"** (may appear as
-   **Artifact Signing**).
-2. Click **Create** and fill in:
-   - **Account name:** lowercase, no spaces — e.g. `clarity-signing`
-     (this exact string becomes the `AZURE_SIGNING_ACCOUNT` variable)
-   - **Region:** **East US** (matches the `https://eus.codesigning.azure.net` endpoint;
-     use the region that gives you that endpoint — East US is the safe default)
-   - **Pricing:** Basic
-3. After creation, open the resource and copy the **Account Endpoint**
-   (something like `https://eus.codesigning.azure.net`) → `AZURE_SIGNING_ENDPOINT`.
+1. Go to https://github.com/apps/signpath and install it into the Clarity repository
+   (or the org that owns it).
+2. Grant it access to the repository. This lets SignPath verify the build really came from
+   your GitHub Actions workflow (origin verification) and download the artifact to sign.
 
-## Step 3 — Give yourself permission to validate identity
+## Step 3 — Create a project, artifact configuration, and signing policy
 
-1. Trusted Signing account → **Access control (IAM)** → **Add role assignment**.
-2. Role: **Trusted Signing Identity Verifier** → assign to your Azure account.
+In the SignPath dashboard (`app.signpath.io`):
 
-## Step 4 — Validate your identity
+1. **Project** — create one for Clarity, e.g. slug `clarity`. Set the repository URL to
+   `https://github.com/CaptainHacX/Clarity`.
+2. **Artifact configuration** — create one describing a single Windows executable
+   (Authenticode). Upload a sample unsigned `Clarity-Setup-<version>.exe` or use the EXE
+   template. Name it e.g. `exe-signing`.
+3. **Signing policy** — create one, e.g. slug `release-signing`, and link it to the
+   certificate provided by SignPath Foundation. Add your **CI user** (see Step 4) as a
+   Submitter.
 
-1. Trusted Signing account → **Identity Validations** → **Request identity validation**.
-2. Choose **Individual** or **Organization** and upload the requested documents
-   (government ID; for an organization: business registration + proof you may sign).
-3. The **name you enter here is the publisher name** that appears on the signed file
-   (e.g. `Advent Development, Inc.` or your legal name). It must match the
-   `AZURE_SIGNING_PUBLISHER` variable exactly.
-4. Wait for approval — **hours to days** (Microsoft is explicit that you cannot create
-   certificate profiles before this completes).
+> The GitHub connector performs origin verification for OSS projects: the artifact must be
+> uploaded as a GitHub Actions artifact and all jobs must run on GitHub-hosted runners.
+> The release workflow already does exactly this.
 
-## Step 5 — Create the certificate profile
+## Step 4 — Create an API token
 
-1. Trusted Signing account → **Certificate Profiles** → **Create**.
-2. Profile type: **Public Trust** (this is what makes signatures trusted by Windows).
-3. Select your **validated identity** from Step 4.
-4. Name it, e.g. `clarity-sign`
-   (this exact string becomes the `AZURE_SIGNING_PROFILE` variable).
+1. In the SignPath dashboard, create a dedicated **CI user** (recommended) or use your own
+   interactive user.
+2. Generate an **API token** for that user (under user settings → API tokens).
+3. The token must belong to a user with **Submitter** permission on the signing policy
+   from Step 3. This is the `SIGNPATH_API_TOKEN` value — copy it now, it's shown once.
 
-## Step 6 — Create an App Registration (the CI's identity)
-
-The GitHub Action can't log in as you — it needs its own identity in Microsoft Entra ID.
-
-1. Microsoft Entra ID → **App registrations** → **New registration**.
-2. Name: e.g. `clarity-codesign` → Register.
-3. On the app's overview page, copy:
-   - **Application (client) ID** → `AZURE_CLIENT_ID`
-   - **Directory (tenant) ID** → `AZURE_TENANT_ID`
-4. **Certificates & secrets** → **New client secret** → choose an expiry (longest
-   available, and rotate before it expires) → **copy the Value now** — Azure shows it
-   only once → `AZURE_CLIENT_SECRET`.
-
-## Step 7 — Grant the app the right to sign
-
-1. Trusted Signing account → **Access control (IAM)** → **Add role assignment**.
-2. Role: **Trusted Signing Certificate Profile Signer**.
-3. Assign it to the **app registration** you made in Step 6 — search for
-   `clarity-codesign`. **Double-check you're assigning to the app, not to yourself** —
-   getting this wrong produces confusing 403 errors.
-
-## Step 8 — Add the secrets and variables to GitHub
+## Step 5 — Add the secret and variables to GitHub
 
 1. GitHub repo → **Settings → Secrets and variables → Actions**.
-2. **Variables** tab → **New repository variable**:
-   | Variable | Example value |
-   |---|---|
-   | `AZURE_SIGNING_ENDPOINT` | `https://eus.codesigning.azure.net` |
-   | `AZURE_SIGNING_ACCOUNT` | `clarity-signing` |
-   | `AZURE_SIGNING_PROFILE` | `clarity-sign` |
-   | `AZURE_SIGNING_PUBLISHER` | `Advent Development, Inc.` (the name from Step 4 — exact match) |
-3. **Secrets** tab → **New repository secret**:
+2. **Secrets** tab → **New repository secret**:
    | Secret | Value |
    |---|---|
-   | `AZURE_TENANT_ID` | Directory (tenant) ID from Step 6 |
-   | `AZURE_CLIENT_ID` | Application (client) ID from Step 6 |
-   | `AZURE_CLIENT_SECRET` | Client secret **Value** from Step 6 |
+   | `SIGNPATH_API_TOKEN` | The API token from Step 4 |
+3. **Variables** tab → **New repository variable**:
+   | Variable | Value |
+   |---|---|
+   | `SIGNPATH_ORGANIZATION_ID` | Your SignPath organization ID |
+   | `SIGNPATH_PROJECT_SLUG` | e.g. `clarity` |
+   | `SIGNPATH_SIGNING_POLICY_SLUG` | e.g. `release-signing` |
+   | `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | e.g. `exe-signing` |
 
-> No `AZURE_CREDENTIALS` secret is needed — the workflow authenticates with these three
-> secrets via electron-builder's Azure module.
-
-## Step 9 — Verify end-to-end
+## Step 6 — Verify end-to-end
 
 1. Push a `v*` tag. Open **Actions** → the **Release** workflow → the **Windows** job.
-   - The **Build, package, and upload** step must pass (it now hard-fails if any secret or
-     variable is missing).
-   - `Clarity-Setup-<version>.exe` appears on the release page.
+   - The job must build the installer, upload it, submit the signing request, and the
+     final **Publish signed installer to release** step must pass.
+   - `Clarity-Setup-<version>.exe` appears on the release page **signed**.
 2. Confirm the signature locally (PowerShell on any Windows machine):
 
    ```powershell
    Get-AuthenticodeSignature .\Clarity-Setup-1.0.2.exe
    ```
 
-   `Status` should be `Valid` and `SignerCertificate.Subject` should contain your
-   publisher name.
+   `Status` should be `Valid` and `SignerCertificate.Subject` should contain
+   **SignPath Foundation**.
+
+---
+
+## How the release workflow signs Windows builds
+
+For Windows only, the release job:
+
+1. Builds the installer **unsigned** (`electron-builder --win`, no publish).
+2. Uploads the unsigned `.exe` as a GitHub Actions artifact (`archive: false`, so it's the
+   raw file).
+3. Submits it to SignPath via
+   `signpath/github-action-submit-signing-request@v2` and waits for completion.
+4. Downloads the signed `.exe`, **regenerates `latest.yml`** (signing changes the binary,
+   so the sha512 recorded for the unsigned build would otherwise be stale), and uploads the
+   signed installer + metadata to the release.
+
+macOS and Linux builds are unaffected.
 
 ---
 
 ## Troubleshooting
 
-**403 / "Forbidden" when signing**
-Almost always the app registration (Step 6) is missing the **Trusted Signing Certificate
-Profile Signer** role (Step 7), or the role was assigned to you instead of the app. Also
-confirm `AZURE_SIGNING_PUBLISHER` matches the identity-validation name byte-for-byte.
+**Job fails at "Verify SignPath Foundation configuration"**
+One of the 5 required settings is missing. Check that `SIGNPATH_API_TOKEN` is a **secret**
+and the four slugs are **variables** (not secrets), and the names match exactly.
 
-**"Account not found" / "Profile not found"**
-`AZURE_SIGNING_ACCOUNT` must be the **Trusted Signing account** name (not the app
-registration name), and `AZURE_SIGNING_PROFILE` the **certificate profile** name — these
-are two different things in Azure.
+**Signing request is rejected / origin verification fails**
+- The **SignPath GitHub App** must be installed (Step 2) and the workflow must run on
+  GitHub-hosted runners (it does).
+- The **project repository URL** must match this repo.
+- The signing policy must allow the **branch** you're pushing the tag from (usually `main`).
+- The CI user must be a **Submitter** on the signing policy.
 
-**Invalid endpoint / network error**
-Use the exact **Account Endpoint** from the portal. East US = `https://eus.codesigning.azure.net`.
+**"Artifact type not supported" / upload format errors**
+The **artifact configuration** (Step 3) must describe a **Windows executable** (Authenticode
+EXE), not a generic zip. If you used the sample-upload route, upload the actual
+`Clarity-Setup-<version>.exe`.
 
-**Client secret rejected**
-The secret **Value** (not the secret's ID) is required, and it must still be within its
-expiry. Regenerate in Entra ID if needed.
-
-**`AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` seen as empty on Windows**
-The workflow only injects these secrets on the Windows runner. Verify you added them under
-**Settings → Secrets** (not variables) and that the workflow run uses the updated secrets.
+**`signed-installer/Clarity-Setup-<version>.exe` not found after signing**
+The download step found no signed artifact under the expected name. Check the signing
+request in the SignPath dashboard for errors, and confirm the artifact configuration's
+output file name matches `Clarity-Setup-<version>.exe`.
 
 **Signature is valid but SmartScreen still shows once**
-Normal for a freshly-issued standard (non-EV) cert. Windows builds reputation as installs
-grow; users click **More info → Run anyway** once. EV signing eliminates it entirely but
-costs more.
+Normal for a freshly-issued certificate on a brand-new publisher lineage. Windows builds
+reputation as installs grow; users click **More info → Run anyway** once. Because SignPath
+Foundation's certificate already has OSS reputation, this is usually minimal from day one.
 
 ---
 
 ## Related
 
+- [SignPath Foundation application](https://signpath.org/)
+- [SignPath GitHub Action docs](https://docs.signpath.io/trusted-build-systems/github)
 - [Apple signing (macOS)](./SIGNING.md)
-- [Azure Trusted Signing pricing](https://azure.microsoft.com/en-us/pricing/details/artifact-signing/)
-- [Microsoft: Set up Trusted Signing](https://learn.microsoft.com/en-us/azure/trusted-signing/how-to-signing-integrations)

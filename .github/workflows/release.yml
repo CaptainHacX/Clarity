@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   create-release:
@@ -108,39 +109,116 @@ jobs:
             echo "DEBUG=electron-notarize*"
           } >> "$GITHUB_ENV"
 
-      - name: Build, package, and upload
+      - name: Verify SignPath Foundation configuration
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+        run: |
+          if [ -z "$SIGNPATH_API_TOKEN" ] || [ -z "$SIGNPATH_ORGANIZATION_ID" ] || [ -z "$SIGNPATH_PROJECT_SLUG" ] || [ -z "$SIGNPATH_SIGNING_POLICY_SLUG" ] || [ -z "$SIGNPATH_ARTIFACT_CONFIGURATION_SLUG" ]; then
+            echo "::error::SignPath Foundation signing not configured (SIGNPATH_API_TOKEN / SIGNPATH_ORGANIZATION_ID / SIGNPATH_PROJECT_SLUG / SIGNPATH_SIGNING_POLICY_SLUG / SIGNPATH_ARTIFACT_CONFIGURATION_SLUG). Refusing to release an unsigned installer — SmartScreen would flag it. See WINDOWS_SIGNING.md."
+            exit 1
+          fi
+
+      - name: Build, package, and upload (macOS / Linux)
+        if: runner.os != 'Windows'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          AZURE_TENANT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID || '' }}
-          AZURE_CLIENT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID || '' }}
-          AZURE_CLIENT_SECRET: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_SECRET || '' }}
-          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
-          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
-          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
-          AZURE_SIGNING_PUBLISHER: ${{ vars.AZURE_SIGNING_PUBLISHER }}
         timeout-minutes: 30
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            if [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_CLIENT_SECRET" ] || [ -z "$AZURE_TENANT_ID" ]; then
-              echo "::error::Windows signing secrets (AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET) not configured. Refusing to release an unsigned installer — SmartScreen would flag it. See WINDOWS_SIGNING.md."
-              exit 1
-            fi
-            if [ -z "$AZURE_SIGNING_ENDPOINT" ] || [ -z "$AZURE_SIGNING_ACCOUNT" ] || [ -z "$AZURE_SIGNING_PROFILE" ] || [ -z "$AZURE_SIGNING_PUBLISHER" ]; then
-              echo "::error::Azure signing variables (AZURE_SIGNING_ENDPOINT / AZURE_SIGNING_ACCOUNT / AZURE_SIGNING_PROFILE / AZURE_SIGNING_PUBLISHER) not set. See WINDOWS_SIGNING.md."
-              exit 1
-            fi
-            npx electron-vite build
-            npx electron-builder ${{ matrix.build-args }} --publish always \
-              -c.win.azureSignOptions.endpoint="$AZURE_SIGNING_ENDPOINT" \
-              -c.win.azureSignOptions.codeSigningAccountName="$AZURE_SIGNING_ACCOUNT" \
-              -c.win.azureSignOptions.certificateProfileName="$AZURE_SIGNING_PROFILE" \
-              -c.win.azureSignOptions.publisherName="$AZURE_SIGNING_PUBLISHER"
+          npx electron-vite build
+          npx electron-builder ${{ matrix.build-args }} --publish always
+
+      - name: Build Windows package (unsigned)
+        if: runner.os == 'Windows'
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          npx electron-vite build
+          npx electron-builder ${{ matrix.build-args }}
+
+      - name: Get version from tag
+        if: runner.os == 'Windows'
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload unsigned installer for signing
+        if: runner.os == 'Windows'
+        id: upload-unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-installer
+          path: dist-prod/Clarity-Setup-${{ steps.version.outputs.version }}.exe
+          archive: false
+          if-no-files-found: error
+
+      - name: Submit signing request to SignPath Foundation
+        if: runner.os == 'Windows'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-installer
+          skip-decompress: true
+
+      - name: Publish signed installer to release
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          exe="Clarity-Setup-${VERSION}.exe"
+          # SignPath may name the signed file per its artifact configuration, so fall
+          # back to any .exe it returned and normalize it to the canonical name.
+          if [ -f "signed-installer/${exe}" ]; then
+            signed="signed-installer/${exe}"
+          elif [ -n "$(ls signed-installer/*.exe 2>/dev/null || true)" ]; then
+            signed="$(ls signed-installer/*.exe 2>/dev/null | head -n1)"
+            echo "Using signed file name '$signed' (artifact configuration returned a different name than $exe)."
           else
-            npx electron-vite build
-            npx electron-builder ${{ matrix.build-args }} --publish always
+            echo "::error::SignPath did not return a signed ${exe} in signed-installer/ — files found: $(ls signed-installer/ 2>/dev/null || echo none)"
+            exit 1
           fi
+          cp "$signed" "dist-prod/${exe}"
+          # Signing rewrites the binary, so the sha512 electron-builder recorded in
+          # latest.yml for the unsigned build is stale. Regenerate it for the signed file.
+          node -e "
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const v = process.env.VERSION;
+            const exe = 'Clarity-Setup-' + v + '.exe';
+            const data = fs.readFileSync('dist-prod/' + exe);
+            const sha512 = crypto.createHash('sha512').update(data).digest('base64');
+            const yml = [
+              'version: ' + v,
+              'files:',
+              '  - url: ' + exe,
+              '    sha512: ' + sha512,
+              '    size: ' + data.length,
+              'path: ' + exe,
+              'sha512: ' + sha512,
+              'releaseDate: ' + JSON.stringify(new Date().toISOString()),
+              ''
+            ].join('\n');
+            fs.writeFileSync('dist-prod/latest.yml', yml);
+          "
+          gh release upload "$GITHUB_REF_NAME" "dist-prod/${exe}" "dist-prod/latest.yml" --clobber
 
   publish-choco:
     needs: build

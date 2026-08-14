@@ -228,10 +228,10 @@ re-export, re-encode, and update `MAC_CERTIFICATE_P12` + `MAC_CERTIFICATE_PASSWO
 
 ## Windows (for reference)
 
-The Windows installer is signed via **Azure Trusted Signing** using separate secrets —
-`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` — plus four repo variables
-(`AZURE_SIGNING_ENDPOINT` / `AZURE_SIGNING_ACCOUNT` / `AZURE_SIGNING_PROFILE` /
-`AZURE_SIGNING_PUBLISHER`). No `AZURE_CREDENTIALS` secret is needed; the workflow
-authenticates via the three secrets directly. That pipeline is independent of the Apple
-secrets above — see [`WINDOWS_SIGNING.md`](WINDOWS_SIGNING.md) for the full setup guide.
-The same fail-if-unsigned guard applies.
+The Windows installer is signed via **SignPath Foundation** (free for open-source
+projects) using one secret — `SIGNPATH_API_TOKEN` — plus four repo variables
+(`SIGNPATH_ORGANIZATION_ID` / `SIGNPATH_PROJECT_SLUG` / `SIGNPATH_SIGNING_POLICY_SLUG` /
+`SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`). The pipeline builds the installer unsigned, submits
+it to SignPath, and attaches the signed `.exe` to the release. That pipeline is independent
+of the Apple secrets above — see [`WINDOWS_SIGNING.md`](WINDOWS_SIGNING.md) for the full
+setup guide. The same fail-if-unsigned guard applies.
