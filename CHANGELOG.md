@@ -1,3 +1,23 @@
+# [1.0.2](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.2) (2026-08-15)
+
+### Features
+
+* **tray:** add menu glyph icons and status-dot overlays to the system tray menu
+* **settings:** expand the settings page with new controls and options
+* **scheduler:** improve scheduled-task handling and edge cases
+* **perf:** add live system telemetry improvements and sensor capability handling
+* **cleaner:** refine context-menu cleaning and system-health reporting
+
+### Bug Fixes
+
+* **sidebar:** fix nested flyout menus being clipped/unclickable in light theme (backdrop-filter containing block)
+* **sidebar:** fix the theme toggle being invisible in light theme
+* **ui:** eliminate scroll lag by removing the full-window blend-mode and reducing backdrop-filter blur radii
+
+### Chore
+
+* add unit tests for the tray icon toolkit and scheduler
+
 # [1.0.1](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.1) (2026-08-11)
 
 ### Features
