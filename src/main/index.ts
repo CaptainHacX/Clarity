@@ -863,8 +863,9 @@ app.on('window-all-closed', () => {
 })
 
 // On macOS, autoUpdater.quitAndInstall() closes all windows *before* emitting
-// before-quit, so mark quitting from this earlier signal too
-app.on('before-quit-for-update', () => {
+// before-quit, so mark quitting from this earlier signal too. Electron 41's
+// typings omit this event overload, but it is a real runtime event.
+app.on('before-quit-for-update' as 'before-quit', () => {
   isQuitting = true
 })
 

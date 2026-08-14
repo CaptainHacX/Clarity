@@ -244,7 +244,7 @@ describe('delete mode validation', () => {
   })
 
   it('coerces invalid mode to recycle', () => {
-    const mode = 'invalid'
+    const mode: string = 'invalid'
     const deleteMode = mode === 'permanent' ? 'permanent' : 'recycle'
     expect(deleteMode).toBe('recycle')
   })

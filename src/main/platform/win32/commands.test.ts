@@ -278,7 +278,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemFileCheck()
+      const result = (await cmds.runSystemFileCheck())!
       expect(result).toEqual({ exitCode: 0, status: 'clean' })
     })
 
@@ -288,7 +288,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemFileCheck()
+      const result = (await cmds.runSystemFileCheck())!
       expect(result.status).toBe('repaired')
     })
 
@@ -298,7 +298,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemFileCheck()
+      const result = (await cmds.runSystemFileCheck())!
       expect(result.status).toBe('corrupt_unrepairable')
     })
 
@@ -308,7 +308,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemFileCheck()
+      const result = (await cmds.runSystemFileCheck())!
       expect(result.status).toBe('failed')
     })
 
@@ -318,13 +318,13 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemFileCheck()
+      const result = (await cmds.runSystemFileCheck())!
       expect(result.status).toBe('unknown')
     })
 
     it('returns failed on error', async () => {
       execFileMock.mockRejectedValue(new Error('timeout'))
-      const result = await cmds.runSystemFileCheck()
+      const result = (await cmds.runSystemFileCheck())!
       expect(result).toEqual({ exitCode: -1, status: 'failed' })
     })
   })
@@ -336,7 +336,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemImageRepair()
+      const result = (await cmds.runSystemImageRepair())!
       expect(result).toEqual({ exitCode: 0, status: 'success' })
     })
 
@@ -346,7 +346,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemImageRepair()
+      const result = (await cmds.runSystemImageRepair())!
       expect(result.status).toBe('corrupt')
     })
 
@@ -356,7 +356,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemImageRepair()
+      const result = (await cmds.runSystemImageRepair())!
       expect(result.status).toBe('clean')
     })
 
@@ -366,7 +366,7 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemImageRepair()
+      const result = (await cmds.runSystemImageRepair())!
       expect(result.status).toBe('success')
     })
 
@@ -376,13 +376,13 @@ describe('win32 commands', () => {
         stderr: '',
       })
 
-      const result = await cmds.runSystemImageRepair()
+      const result = (await cmds.runSystemImageRepair())!
       expect(result.status).toBe('unknown')
     })
 
     it('returns failed on error', async () => {
       execFileMock.mockRejectedValue(new Error('timeout'))
-      const result = await cmds.runSystemImageRepair()
+      const result = (await cmds.runSystemImageRepair())!
       expect(result).toEqual({ exitCode: -1, status: 'failed' })
     })
   })

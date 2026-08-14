@@ -6,8 +6,8 @@ import { describe, it, expect } from 'vitest'
 // the require cache BEFORE importing the module under test.
 
 const mockPrivacySettings = [
-  { id: 'telemetry', name: 'Telemetry', category: 'Privacy' },
-  { id: 'advertising', name: 'Advertising ID', category: 'Privacy' },
+  { id: 'telemetry', label: 'Telemetry', category: 'Privacy' },
+  { id: 'advertising', label: 'Advertising ID', category: 'Privacy' },
 ]
 
 const MOCK_KEY = '/mock/privacy-shield.ipc'
@@ -52,11 +52,11 @@ describe('win32 privacy', () => {
       expect(settings[1].id).toBe('advertising')
     })
 
-    it('each setting has id and name properties', () => {
+    it('each setting has id and label properties', () => {
       const settings = privacy.getSettings()
       for (const s of settings) {
         expect(s.id).toBeTruthy()
-        expect(s.name).toBeTruthy()
+        expect(s.label).toBeTruthy()
       }
     })
   })

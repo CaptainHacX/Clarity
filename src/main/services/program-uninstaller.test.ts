@@ -10,7 +10,7 @@ vi.mock('child_process', () => {
   const { promisify } = require('util')
   const execFileFn = (...args: unknown[]) => mockExecFile(...args)
   // Add custom promisify so that promisify(execFile) returns {stdout, stderr}
-  execFileFn[promisify.custom] = (...args: unknown[]) => {
+  (execFileFn as any)[promisify.custom] = (...args: unknown[]) => {
     return new Promise((resolve, reject) => {
       mockExecFile(...args, (err: Error | null, stdout: string, stderr: string) => {
         if (err) {
@@ -1040,7 +1040,7 @@ describe('getInstalledProgramsFull', () => {
 
     // Should call reg query for each of the 3 registry keys
     const regCalls = mockExecFile.mock.calls.filter(
-      (call: unknown[]) => call[0] === 'reg' && call[1]?.[0] === 'query'
+      (call: any[]) => call[0] === 'reg' && call[1]?.[0] === 'query'
     )
     expect(regCalls).toHaveLength(3)
   })

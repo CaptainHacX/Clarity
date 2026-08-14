@@ -13,7 +13,6 @@ function sock(partial: Partial<NormalizedSocket> & { localPort: number }): Norma
   return {
     protocol: 'tcp',
     localAddress: '0.0.0.0',
-    localPort: partial.localPort,
     peerAddress: '*',
     peerPort: '*',
     state: 'UNKNOWN',

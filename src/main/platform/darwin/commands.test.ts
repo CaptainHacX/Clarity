@@ -241,7 +241,7 @@ describe('darwin commands', () => {
         ].join('\n'),
       })
 
-      const updates = await commands.checkOsUpdates()
+      const updates = (await commands.checkOsUpdates())!
       expect(updates).toHaveLength(2)
       expect(updates[0].title).toBe('macOS Sequoia 15.2')
       expect(updates[0].sizeBytes).toBe(1.5 * 1024 * 1024 * 1024)
@@ -252,7 +252,7 @@ describe('darwin commands', () => {
       execFileMock.mockResolvedValue({
         stdout: '   * Label: Small Update\n     Size: 500K\n',
       })
-      const updates = await commands.checkOsUpdates()
+      const updates = (await commands.checkOsUpdates())!
       expect(updates[0].sizeBytes).toBe(500 * 1024)
     })
 
@@ -260,13 +260,13 @@ describe('darwin commands', () => {
       execFileMock.mockResolvedValue({
         stdout: '   * Label: Tiny Update\n     Size: 1024\n',
       })
-      const updates = await commands.checkOsUpdates()
+      const updates = (await commands.checkOsUpdates())!
       expect(updates[0].sizeBytes).toBe(1024)
     })
 
     it('returns empty array on failure', async () => {
       execFileMock.mockRejectedValue(new Error('fail'))
-      const updates = await commands.checkOsUpdates()
+      const updates = (await commands.checkOsUpdates())!
       expect(updates).toEqual([])
     })
   })
@@ -274,7 +274,7 @@ describe('darwin commands', () => {
   describe('installOsUpdates', () => {
     it('returns needsReboot true when stdout contains restart', async () => {
       execFileMock.mockResolvedValue({ stdout: 'Done. Please restart your computer.' })
-      const result = await commands.installOsUpdates()
+      const result = (await commands.installOsUpdates())!
       expect(result.needsReboot).toBe(true)
       expect(result.installed).toBe(1)
       expect(result.resultCode).toBe(0)
@@ -282,13 +282,13 @@ describe('darwin commands', () => {
 
     it('returns needsReboot false when no restart mentioned', async () => {
       execFileMock.mockResolvedValue({ stdout: 'Done.' })
-      const result = await commands.installOsUpdates()
+      const result = (await commands.installOsUpdates())!
       expect(result.needsReboot).toBe(false)
     })
 
     it('returns error result on failure', async () => {
       execFileMock.mockRejectedValue(new Error('fail'))
-      const result = await commands.installOsUpdates()
+      const result = (await commands.installOsUpdates())!
       expect(result.installed).toBe(0)
       expect(result.resultCode).toBe(-1)
       expect(result.needsReboot).toBe(false)

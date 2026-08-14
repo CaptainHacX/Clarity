@@ -112,7 +112,7 @@ describe('security-service', () => {
 
   it('carries device identity onto the result so rows never read "unknown"', async () => {
     const snapshot = fakeDevices()
-    snapshot.devices[0].vendor = 'Netgear'
+    ;(snapshot.devices[0] as { vendor: string | null }).vendor = 'Netgear'
     snapshot.devices[0].hostname = null
     snapshot.devices[0].kind = 'router'
     snapshot.devices[0].services = [{ name: 'admin', type: '_http._tcp', port: 80 }] as never
@@ -168,7 +168,7 @@ describe('security-service', () => {
       expect(started.ok).toBe(true)
       // The sweep is still in flight, and the UI can already read its progress.
       expect(getSecuritySnapshot().devices.find((d) => d.ip === '192.168.1.10')?.fullScan.state).toBe('running')
-      release?.()
+      ;(release as (() => void) | null)?.()
     })
 
     it('explains a refusal instead of failing silently', async () => {
@@ -213,7 +213,7 @@ describe('security-service', () => {
         ok: false,
         error: expect.stringContaining('already running'),
       })
-      release?.()
+      ;(release as (() => void) | null)?.()
     })
 
     it('surfaces an engine failure as an error state with its reason', async () => {

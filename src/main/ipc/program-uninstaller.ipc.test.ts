@@ -188,7 +188,7 @@ describe('program-uninstaller IPC', () => {
       // Should have sent 'uninstalling' and 'scanning-leftovers' progress events
       const phases = calls
         .filter(([ch]: string[]) => ch === 'uninstaller:progress')
-        .map(([, data]: [string, { phase: string }]) => data.phase)
+        .map(([, data]: any[]) => data.phase)
 
       expect(phases).toContain('uninstalling')
       expect(phases).toContain('scanning-leftovers')
@@ -210,7 +210,7 @@ describe('program-uninstaller IPC', () => {
       const calls = (win.webContents.send as ReturnType<typeof vi.fn>).mock.calls
       const phases = calls
         .filter(([ch]: string[]) => ch === 'uninstaller:progress')
-        .map(([, data]: [string, { phase: string }]) => data.phase)
+        .map(([, data]: any[]) => data.phase)
 
       expect(phases).toContain('cleaning-leftovers')
     })

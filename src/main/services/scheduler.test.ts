@@ -16,6 +16,7 @@ function makeSettings(
   overrides: Partial<ClaritySettings['schedule']> & { enabled?: boolean } = {}
 ): ClaritySettings {
   return {
+    theme: 'dark',
     language: 'en',
     minimizeToTray: false,
     showNotificationOnComplete: true,
@@ -29,8 +30,13 @@ function makeSettings(
       secureDelete: false,
       closeBrowsersBeforeClean: false,
       createRestorePoint: false,
+      protectRecycleBin: false,
+      keepDeletionLog: false,
     },
     exclusions: [],
+    ignoredSoftwareUpdates: [],
+    backupPath: '',
+    backupMode: 'targeted',
     schedule: {
       enabled: overrides.enabled ?? true,
       frequency: overrides.frequency ?? 'daily',
@@ -38,6 +44,27 @@ function makeSettings(
       hour: overrides.hour ?? 9,
     },
     schedules: [],
+    windowsPackageManager: 'winget',
+    gameMode: {
+      enabledOptimizations: [],
+      customProcessKillList: [],
+      autoDetect: false,
+      autoDeactivate: true,
+      customGameProcesses: [],
+    },
+    registryIgnoredTweaks: [],
+    malwareAllowlist: [],
+    alerts: {
+      enabled: true,
+      showInApp: true,
+      showSystem: true,
+      cpuUsageThreshold: 90,
+      cpuTempThreshold: 90,
+      memoryThreshold: 90,
+      diskSpaceThresholdGb: 10,
+      batteryThreshold: 20,
+      cooldownMinutes: 30,
+    },
   }
 }
 

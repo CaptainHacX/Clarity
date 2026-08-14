@@ -321,7 +321,7 @@ async function resolveServiceNames(
 
 // ── Scanning ──────────────────────────────────────────────
 
-function buildProcessMap(procList: si.Systeminformation.ProcessData[]): Map<number, ProcessInfo> {
+function buildProcessMap(procList: si.Systeminformation.ProcessesProcessData[]): Map<number, ProcessInfo> {
   const map = new Map<number, ProcessInfo>()
   for (const p of procList) {
     map.set(p.pid, {
@@ -348,8 +348,8 @@ export async function fetchSockets(): Promise<NormalizedSocket[]> {
       protocol,
       localAddress: r.localAddress || '*',
       localPort,
-      peerAddress: r.peerAddress || r.remoteAddress || '*',
-      peerPort: String(r.peerPort ?? r.remotePort ?? ''),
+      peerAddress: r.peerAddress || '*',
+      peerPort: r.peerPort || '',
       state: (r.state || 'UNKNOWN').toUpperCase(),
       pid: parsePid(r.pid),
       processPath: typeof r.process === 'string' && r.process ? r.process : null,

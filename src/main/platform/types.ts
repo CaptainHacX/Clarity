@@ -237,7 +237,7 @@ export interface PlatformStartup {
     enabled: boolean
   ): Promise<boolean>
   deleteItem?(name: string, location: string, source: StartupItem['source']): Promise<boolean>
-  getBootTrace?(): Promise<StartupBootTrace>
+  getBootTrace(): Promise<StartupBootTrace>
 }
 
 // ─── Privacy ────────────────────────────────────────────────
@@ -325,13 +325,13 @@ export interface PlatformNetwork {
   /** Get DNS cache entries. Returns empty array if not supported on this platform. */
   getDnsCacheEntries(): Promise<DnsCacheEntry[]>
   /** Flush the DNS resolver cache. Returns true on success. */
-  flushDnsCache?(): Promise<boolean>
+  flushDnsCache(): Promise<boolean>
   /** List saved Wi-Fi profiles. */
-  getWifiProfiles?(): Promise<WifiProfile[]>
+  getWifiProfiles(): Promise<WifiProfile[]>
   /** Delete a saved Wi-Fi profile by name. */
-  deleteWifiProfile?(name: string): Promise<boolean>
+  deleteWifiProfile(name: string): Promise<boolean>
   /** Clear the ARP cache. Returns true on success. */
-  clearArpCache?(): Promise<boolean>
+  clearArpCache(): Promise<boolean>
 }
 
 // ─── Top-level Provider ─────────────────────────────────────

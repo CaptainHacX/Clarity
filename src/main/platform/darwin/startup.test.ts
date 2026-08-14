@@ -304,7 +304,7 @@ describe('darwin startup', () => {
     })
 
     it('unloads and deletes a launch agent plist', async () => {
-      const result = await startup.deleteItem(
+      const result = await startup.deleteItem!(
         'com.test', userPlist,
         'launch-agent-user',
       )
@@ -318,7 +318,7 @@ describe('darwin startup', () => {
 
     it('still deletes the file if unload fails (already unloaded)', async () => {
       execFileMock.mockRejectedValue(new Error('already unloaded'))
-      const result = await startup.deleteItem(
+      const result = await startup.deleteItem!(
         'com.test', userPlist,
         'launch-agent-user',
       )
@@ -327,13 +327,13 @@ describe('darwin startup', () => {
     })
 
     it('rejects paths outside allowed directories', async () => {
-      const result = await startup.deleteItem('evil', '/etc/evil.plist', 'launch-agent-user')
+      const result = await startup.deleteItem!('evil', '/etc/evil.plist', 'launch-agent-user')
       expect(result).toBe(false)
       expect(unlinkMock).not.toHaveBeenCalled()
     })
 
     it('deletes a login item via osascript', async () => {
-      const result = await startup.deleteItem('MyApp', 'Login Items', 'login-item')
+      const result = await startup.deleteItem!('MyApp', 'Login Items', 'login-item')
       expect(result).toBe(true)
       expect(execFileMock).toHaveBeenCalledWith(
         '/usr/bin/osascript',
@@ -343,13 +343,13 @@ describe('darwin startup', () => {
     })
 
     it('returns false for unknown source types', async () => {
-      const result = await startup.deleteItem('test', '/path', 'registry' as any)
+      const result = await startup.deleteItem!('test', '/path', 'registry' as any)
       expect(result).toBe(false)
     })
 
     it('returns false on delete error', async () => {
       unlinkMock.mockRejectedValue(new Error('permission denied'))
-      const result = await startup.deleteItem(
+      const result = await startup.deleteItem!(
         'com.test', userPlist,
         'launch-agent-user',
       )

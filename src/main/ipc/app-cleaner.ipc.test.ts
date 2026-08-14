@@ -41,10 +41,10 @@ import { registerAppCleanerIpc } from './app-cleaner.ipc'
 
 // ── Helpers ──
 
-function getHandler(channel: string): (...args: unknown[]) => unknown {
+function getHandler(channel: string): (...args: unknown[]) => any {
   const call = mockHandle.mock.calls.find((c) => c[0] === channel)
   if (!call) throw new Error(`No handler registered for ${channel}`)
-  return call[1] as (...args: unknown[]) => unknown
+  return call[1] as (...args: unknown[]) => any
 }
 
 function mockWindow() {
