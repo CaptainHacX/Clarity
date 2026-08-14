@@ -79,13 +79,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Azure login (Windows signing)
-        if: runner.os == 'Windows' && vars.AZURE_SIGNING == 'true'
-        uses: azure/login@v3
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-          allow-no-subscriptions: true
-
       - name: Default code signing config
         shell: bash
         run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
@@ -101,8 +94,8 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          if [ -z "$MAC_CERTIFICATE_P12" ]; then
-            echo "macOS signing secrets not configured; building unsigned (ad-hoc)"
+          if [ -z "$MAC_CERTIFICATE_P12" ] || [ -z "$MAC_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::warning::Apple signing/notarization secrets not configured — shipping an ad-hoc signed build. Users must approve Clarity once in System Settings > Privacy & Security (see README, 'Installing on macOS'). Add the secrets from SIGNING.md to switch to clean, Gatekeeper-approved installs."
             exit 0
           fi
           {
@@ -122,16 +115,30 @@ jobs:
           AZURE_TENANT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID || '' }}
           AZURE_CLIENT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID || '' }}
           AZURE_CLIENT_SECRET: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          AZURE_SIGNING_PUBLISHER: ${{ vars.AZURE_SIGNING_PUBLISHER }}
         timeout-minutes: 30
         run: |
-          npx electron-vite build
-          if [ "$RUNNER_OS" = "Windows" ] && [ -n "$AZURE_CLIENT_ID" ]; then
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            if [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_CLIENT_SECRET" ] || [ -z "$AZURE_TENANT_ID" ]; then
+              echo "::error::Windows signing secrets (AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET) not configured. Refusing to release an unsigned installer — SmartScreen would flag it. See WINDOWS_SIGNING.md."
+              exit 1
+            fi
+            if [ -z "$AZURE_SIGNING_ENDPOINT" ] || [ -z "$AZURE_SIGNING_ACCOUNT" ] || [ -z "$AZURE_SIGNING_PROFILE" ] || [ -z "$AZURE_SIGNING_PUBLISHER" ]; then
+              echo "::error::Azure signing variables (AZURE_SIGNING_ENDPOINT / AZURE_SIGNING_ACCOUNT / AZURE_SIGNING_PROFILE / AZURE_SIGNING_PUBLISHER) not set. See WINDOWS_SIGNING.md."
+              exit 1
+            fi
+            npx electron-vite build
             npx electron-builder ${{ matrix.build-args }} --publish always \
-              -c.win.azureSignOptions.endpoint="https://eus.codesigning.azure.net" \
-              -c.win.azureSignOptions.codeSigningAccountName="clarity-signing" \
-              -c.win.azureSignOptions.certificateProfileName="clarity-sign" \
-              -c.win.azureSignOptions.publisherName="Advent Development, Inc."
+              -c.win.azureSignOptions.endpoint="$AZURE_SIGNING_ENDPOINT" \
+              -c.win.azureSignOptions.codeSigningAccountName="$AZURE_SIGNING_ACCOUNT" \
+              -c.win.azureSignOptions.certificateProfileName="$AZURE_SIGNING_PROFILE" \
+              -c.win.azureSignOptions.publisherName="$AZURE_SIGNING_PUBLISHER"
           else
+            npx electron-vite build
             npx electron-builder ${{ matrix.build-args }} --publish always
           fi
 

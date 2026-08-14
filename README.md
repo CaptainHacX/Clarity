@@ -69,7 +69,24 @@ Grab the latest installer for your platform from [GitHub Releases](https://githu
 | **macOS** | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-arm64.dmg) |
 | **Linux** | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-amd64.deb) |
 
-> Installers are currently **unsigned**. On macOS, right-click the app and choose **Open** the first time you launch it.
+> **macOS note:** Clarity is **ad-hoc signed** but not notarized with an Apple Developer ID
+> (that requires a paid Apple Developer account, which the project doesn't fund yet).
+> Apple Silicon machines show **"Clarity" cannot be opened because the developer cannot
+> be verified** on first launch. Fix it once:
+>
+> 1. Click **Cancel**, then open **System Settings → Privacy & Security**.
+> 2. Scroll to the **Security** section and click **Open Anyway** next to Clarity.
+> 3. Confirm in the dialog that appears. Clarity then launches normally.
+>
+> Terminal users can skip the prompt entirely:
+>
+> ```bash
+> xattr -dr com.apple.quarantine "/Applications/Clarity.app"
+> ```
+>
+> Windows releases are held until signing is configured (unsigned installers trigger
+> SmartScreen, which we won't ship). See [WINDOWS_SIGNING.md](WINDOWS_SIGNING.md) — once
+> set up, the installer you download is signed and SmartScreen-clean.
 
 ## Why Clarity?
 
