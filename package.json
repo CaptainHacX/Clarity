@@ -59,7 +59,8 @@
     "test:watch": "vitest",
     "validate:rules": "tsx src/main/rules/validate.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "package": "electron-builder --config electron-builder.yml"
+    "package": "electron-builder --config electron-builder.yml",
+    "release": "node scripts/release.js"
   },
   "overrides": {
     "fs-extra": "^11.3.0"
