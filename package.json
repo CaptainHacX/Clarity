@@ -1,6 +1,6 @@
 {
   "name": "clarity",
-  "version": "1.0.4",
+  "version": "1.0.3",
   "description": "A modern, open-source system cleaner for Windows, macOS, and Linux",
   "desktopName": "Clarity",
   "main": "./out/main/index.js",

@@ -1,4 +1,4 @@
-# [1.0.4](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.4) (2026-08-15)
+# [1.0.3](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.3) (2026-08-15)
 
 ### Features
 
