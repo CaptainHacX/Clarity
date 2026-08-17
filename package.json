@@ -47,6 +47,7 @@
     "electron": "^41.10.3",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "node-gyp": "^12.4.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.5",
     "typescript": "^5.9.3",
@@ -54,6 +55,7 @@
     "vitest": "^3.2.7"
   },
   "scripts": {
+    "postinstall": "node scripts/build-native.js",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",

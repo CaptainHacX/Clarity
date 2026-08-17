@@ -80,6 +80,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # A macOS build with no CoreWLAN binary still packages and still launches,
+      # it just silently loses every BSSID — so nothing downstream would catch
+      # it. v1.1.0 shipped exactly that way. Fail the release instead.
+      - name: Verify CoreWLAN addon built
+        if: runner.os == 'macOS'
+        run: |
+          node -e "
+          const m = require('clarity-corewlan').load()
+          if (!m) {
+            console.error('CoreWLAN addon missing — a macOS release without it has no BSSID support.')
+            console.error('The postinstall (scripts/build-native.js) should have compiled it.')
+            process.exit(1)
+          }
+          console.log('CoreWLAN addon OK')
+          "
+
       - name: Default code signing config
         shell: bash
         run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
