@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { inflateSync } from 'zlib'
-import { encodePng, glyphRgba, glyphPngAt, menuIconPng, overlayDotOnBitmap, recolorBitmap } from './tray-icons'
+import { encodePng, glyphRgba, glyphPngAt, menuIconPng, overlayDotOnBitmap, recolorBitmap, type MenuIconName } from './tray-icons'
 
 describe('encodePng', () => {
   it('starts with the PNG signature', () => {
@@ -26,24 +26,74 @@ describe('encodePng', () => {
   })
 })
 
+/**
+ * Glyphs are vector primitives rasterized with anti-aliasing, replacing the
+ * hand-drawn 16×16 blocks of solid pixels these tests used to describe. Two of
+ * the old assertions pinned that mechanism rather than any behaviour — every
+ * pixel being exactly opaque or exactly transparent, and 32px being a 4×
+ * block-scale of 16px — and both are deliberately no longer true. Partial alpha
+ * is the point: it is what stops a diagonal looking ragged on a menu bar.
+ */
 describe('glyphRgba / menuIconPng', () => {
-  it('renders on-pixels opaque with the requested color and off-pixels transparent', () => {
+  it('paints every lit pixel in the requested colour, varying only alpha', () => {
     const rgba = glyphRgba('play', [1, 2, 3])
-    let opaque = 0
-    let transparent = 0
+    let lit = 0
+    let clear = 0
     for (let i = 0; i < rgba.length; i += 4) {
-      if (rgba[i + 3] === 255) {
-        opaque++
+      if (rgba[i + 3] > 0) {
+        lit++
         expect(rgba[i]).toBe(1) // R
         expect(rgba[i + 1]).toBe(2) // G
         expect(rgba[i + 2]).toBe(3) // B
       } else {
-        expect(rgba[i + 3]).toBe(0)
-        transparent++
+        clear++
       }
     }
-    expect(opaque).toBeGreaterThan(0)
-    expect(transparent).toBeGreaterThan(0)
+    expect(lit).toBeGreaterThan(0)
+    expect(clear).toBeGreaterThan(0)
+  })
+
+  it('anti-aliases edges rather than producing only hard pixels', () => {
+    // A diagonal must land on partial coverage somewhere, or it is aliased.
+    const rgba = glyphRgba('activity', [255, 255, 255])
+    let partial = 0
+    let solid = 0
+    for (let i = 3; i < rgba.length; i += 4) {
+      if (rgba[i] > 0 && rgba[i] < 255) partial++
+      else if (rgba[i] === 255) solid++
+    }
+    expect(solid).toBeGreaterThan(0)
+    expect(partial).toBeGreaterThan(0)
+  })
+
+  it('renders every glyph in the union with visible ink and clear space', () => {
+    // Guards against a typo in a primitive silently producing an empty icon, or
+    // one that floods the whole 16×16 box.
+    const names: MenuIconName[] = [
+      'play', 'quickScan', 'restorePoint', 'home', 'eraser', 'bug',
+      'gauge', 'sliders', 'power', 'bell', 'calendar', 'activity',
+    ]
+    for (const name of names) {
+      const rgba = glyphRgba(name, [255, 255, 255])
+      let lit = 0
+      for (let i = 3; i < rgba.length; i += 4) if (rgba[i] > 0) lit++
+      expect(lit, `${name} has no ink`).toBeGreaterThan(12)
+      expect(lit, `${name} floods the box`).toBeLessThan(16 * 16 * 0.8)
+    }
+  })
+
+  it('draws play pointing right, not up', () => {
+    // The previous art was a triangle with its apex at the top, which reads as a
+    // sort-ascending marker. A ▶ has its ink mass on the left, tapering right.
+    const rgba = glyphRgba('play', [255, 255, 255])
+    const inkIn = (x0: number, x1: number): number => {
+      let n = 0
+      for (let y = 0; y < 16; y++) {
+        for (let x = x0; x < x1; x++) if (rgba[(y * 16 + x) * 4 + 3] > 0) n++
+      }
+      return n
+    }
+    expect(inkIn(0, 8)).toBeGreaterThan(inkIn(8, 16))
   })
 
   it('menuIconPng returns a cached identical buffer on repeat calls', () => {
@@ -53,13 +103,18 @@ describe('glyphRgba / menuIconPng', () => {
     expect(a.length).toBeGreaterThan(8)
   })
 
-  it('glyphPngAt scales a glyph up cleanly at 32px', () => {
+  it('caches per colour, so a theme switch cannot serve the previous tint', () => {
+    const dark = menuIconPng('home', [232, 232, 232])
+    const light = menuIconPng('home', [26, 26, 26])
+    expect(dark.equals(light)).toBe(false)
+  })
+
+  it('renders a genuinely denser glyph at 32px, not a block-scaled 16px one', () => {
     const base = glyphRgba('home', [1, 2, 3])
-    const big = glyphPngAt('home', [1, 2, 3], 32)
-    const png = decodePng(big)
+    const png = decodePng(glyphPngAt('home', [1, 2, 3], 32))
     expect(png.width).toBe(32)
     expect(png.height).toBe(32)
-    // A 16px glyph scaled 2x fills exactly 2x2 blocks — every lit pixel is opaque.
+
     let lit = 0
     for (let i = 0; i < png.rgba.length; i += 4) {
       if (png.rgba[i + 3] !== 0) {
@@ -69,8 +124,11 @@ describe('glyphRgba / menuIconPng', () => {
         expect(png.rgba[i + 2]).toBe(3)
       }
     }
+    // Roughly 4× the area, but not exactly — a real 32px render resolves detail a
+    // doubled 16px bitmap cannot. Exact equality would mean we are still scaling.
     const baseLit = countLit(base)
-    expect(lit).toBe(baseLit * 4)
+    expect(lit).toBeGreaterThan(baseLit * 2)
+    expect(lit).not.toBe(baseLit * 4)
   })
 })
 

@@ -468,7 +468,14 @@ function readTrayStatus(): TrayStatus {
 }
 
 function trayFingerprint(s: TrayStatus): string {
-  return [s.nextScanLabel, s.alerts, s.threats, s.showThreatNotifications, s.scheduleEnabled, quickScanInFlight].join('|')
+  return [
+    s.nextScanLabel, s.alerts, s.threats, s.showThreatNotifications, s.scheduleEnabled, quickScanInFlight,
+    // The glyph colour is baked into every menu icon at build time, so the OS
+    // theme is part of what the menu displays. Without it here the fingerprint
+    // matched after a light/dark switch, refreshTrayMenu() returned early, and
+    // the icons kept the old colour — dark glyphs on a dark menu bar.
+    nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+  ].join('|')
 }
 
 function statusColorFor(s: TrayStatus): StatusColor | null {
@@ -547,10 +554,10 @@ function createStatusTrayIcon(color: StatusColor): Electron.NativeImage {
   return img
 }
 
-function updateTrayStatusIcon(): void {
+function updateTrayStatusIcon(force = false): void {
   if (!tray) return
   const color = statusColorFor(readTrayStatus())
-  if (color === lastStatusColor) return
+  if (color === lastStatusColor && !force) return
   lastStatusColor = color
   if (!color) {
     tray.setImage(createTrayIcon())
@@ -585,6 +592,26 @@ function createTray(): void {
 
   // Keep "next scan", alert counts and the icon status dot current while running
   trayRefreshTimer = setInterval(refreshTrayMenu, TRAY_REFRESH_MS)
+}
+
+/**
+ * Redraw the tray for the current OS theme.
+ *
+ * Every glyph — the brand mark on Windows/Linux and all the menu icons — is
+ * rasterized in a single colour chosen from `nativeTheme` at build time. Nothing
+ * was listening for a theme change, so switching the OS between light and dark
+ * left those pixels as they were: on macOS the menu icons, and on Windows/Linux
+ * the tray icon itself, became near-invisible against the new chrome until
+ * something else happened to invalidate the fingerprint.
+ *
+ * The status icon is forced because its colour is unchanged by a theme switch —
+ * only the tint underneath it is — so the usual equality guard would skip it.
+ */
+function handleThemeChange(): void {
+  if (!tray) return
+  lastTrayFingerprint = ''
+  refreshTrayMenu()
+  updateTrayStatusIcon(true)
 }
 
 /** Force a full tray rebuild (e.g. after a language change). */
@@ -812,6 +839,9 @@ app.whenReady().then(() => {
   app.on('clarity:language-changed' as any, () => {
     rebuildTrayMenu()
   })
+
+  // Redraw tray glyphs when the OS switches between light and dark.
+  nativeTheme.on('updated', handleThemeChange)
 
   // IPC to get next scan time for the UI
   ipcMain.handle(IPC.SCHEDULE_NEXT_SCAN, () => {
