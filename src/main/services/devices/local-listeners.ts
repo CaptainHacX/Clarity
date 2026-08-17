@@ -1,6 +1,7 @@
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { readFileSync } from 'fs'
+import { join } from 'path'
 import type { LocalListener } from '../../../shared/types'
 
 const execFileAsync = promisify(execFile)
@@ -106,20 +107,39 @@ export async function runNetstat(): Promise<RawListenerLine[]> {
 }
 
 /** Read /etc/hosts — name(s) that point at a loopback address. */
+/**
+ * Where the hosts file lives. Windows keeps it under the system root rather than
+ * /etc, and the location moves with a non-standard install, so it is read from
+ * the environment rather than hardcoded to C:.
+ */
+export function hostsFilePath(): string {
+  if (process.platform !== 'win32') return '/etc/hosts'
+  const systemRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows'
+  return join(systemRoot, 'System32', 'drivers', 'etc', 'hosts')
+}
+
+/** Loopback aliases declared in a hosts file, given its contents. */
+export function parseHostsLoopbackNames(content: string): string[] {
+  const names = new Set<string>()
+  for (const line of content.split(/\r?\n/)) {
+    const clean = line.replace(/#.*$/, '').trim()
+    if (!clean) continue
+    const parts = clean.split(/\s+/)
+    const addr = parts[0]?.toLowerCase()
+    if (!addr) continue
+    if (addr === '127.0.0.1' || addr === '::1' || addr.startsWith('127.')) {
+      for (const p of parts.slice(1)) if (p) names.add(p)
+    }
+  }
+  return [...names]
+}
+
 export function readHostsLoopbackNames(): string[] {
   try {
-    const names = new Set<string>()
-    for (const line of readFileSync('/etc/hosts', 'utf-8').split(/\r?\n/)) {
-      const clean = line.replace(/#.*$/, '').trim()
-      if (!clean) continue
-      const parts = clean.split(/\s+/)
-      const addr = parts[0]?.toLowerCase()
-      if (addr === '127.0.0.1' || addr === '::1' || addr.startsWith('127.')) {
-        for (const p of parts.slice(1)) if (p) names.add(p)
-      }
-    }
-    return [...names]
+    return parseHostsLoopbackNames(readFileSync(hostsFilePath(), 'utf-8'))
   } catch {
+    // No hosts file, or no permission to read it. Loopback rows just lose their
+    // friendly aliases; the port list itself is unaffected.
     return []
   }
 }
