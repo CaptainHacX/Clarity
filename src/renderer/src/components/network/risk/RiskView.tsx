@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import {
   Activity,
   Cable,
@@ -16,15 +15,24 @@ import {
   ShieldX,
   Trash2,
 } from 'lucide-react'
-import { toast } from 'sonner'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorAlert } from '@/components/shared/ErrorAlert'
 import { cn } from '@/lib/utils'
 import { useSecurityStore } from '@/stores/security-store'
-import { useDevicesStore } from '@/stores/devices-store'
 import { deviceDisplayName, isPrivateMac } from '@shared/devices'
 import type { CatalogProbeState, DeviceSecurityResult, SecuritySeverity } from '@shared/types'
+
+/**
+ * Per-device security risk — the former standalone Security page, now the "Risk"
+ * view of the Devices tab.
+ *
+ * It always was a second lens on the same device set: it shares `devices-store`
+ * data, and its "open ports" button already jumped to the Devices page and
+ * switched that page's detail tab. Being in the same page turns that jump into
+ * `onOpenInventory`, so the two views no longer navigate at each other.
+ *
+ * Keeps the `security` i18n namespace, so no locale file changes.
+ */
 
 const SEVERITY_META: Record<SecuritySeverity, { color: string; bg: string; icon: typeof ShieldAlert }> = {
   high: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', icon: ShieldAlert },
@@ -57,8 +65,8 @@ function severityTier(severity: SecuritySeverity): number {
 }
 
 /**
- * The label a device leads with. Netfox's rule: a name the user gave it, then
- * the one it reports, then *vendor · kind · services* — so a row reads
+ * The label a device leads with: a name the user gave it, then the one it
+ * reports, then *vendor · kind · services* — so a row reads
  * "Netgear · Router · Web service" instead of the bare word "Unknown".
  */
 function deviceLabel(device: DeviceSecurityResult, kindLabels: Record<string, string>, fallback: string): string {
@@ -77,9 +85,8 @@ function deviceLabel(device: DeviceSecurityResult, kindLabels: Record<string, st
   )
 }
 
-export function SecurityPage() {
+export function RiskView({ onOpenInventory }: { onOpenInventory: (deviceId: string) => void }) {
   const { t } = useTranslation('security')
-  const navigate = useNavigate()
   const snapshot = useSecurityStore((s) => s.snapshot)
   const scanning = useSecurityStore((s) => s.scanning)
   const probing = useSecurityStore((s) => s.probing)
@@ -93,8 +100,6 @@ export function SecurityPage() {
   const reset = useSecurityStore((s) => s.reset)
   const start = useSecurityStore((s) => s.start)
   const stop = useSecurityStore((s) => s.stop)
-  const setDevicesSelected = useDevicesStore((s) => s.setSelected)
-  const setDetailTab = useDevicesStore((s) => s.setDetailTab)
   const [query, setQuery] = useState('')
 
   useEffect(() => {
@@ -177,7 +182,7 @@ export function SecurityPage() {
   const hasResults = devices.length > 0
   const scannedSomething = devices.some((d) => d.lastScannedAt != null)
 
-  // The hero adapts the way Netfox's does: the most important thing first.
+  // The hero leads with the most important thing.
   const hero = counts.high > 0
     ? { title: t('heroHigh', { count: counts.high }), tone: '#ef4444', bg: 'rgba(239,68,68,0.10)', Icon: ShieldAlert }
     : counts.medium > 0
@@ -186,67 +191,55 @@ export function SecurityPage() {
         ? { title: t('heroClear'), tone: '#22c55e', bg: 'rgba(34,197,94,0.10)', Icon: ShieldCheck }
         : { title: t('heroFirstScan'), tone: 'var(--text-muted)', bg: 'var(--bg-subtle-2)', Icon: ShieldX }
 
-  const openInDevices = (device: DeviceSecurityResult): void => {
-    setDevicesSelected(device.deviceId)
-    setDetailTab('ports')
-    navigate('/devices')
-  }
-
   return (
-    <div className="flex h-full flex-col">
-      <PageHeader
-        title={t('title')}
-        description={t('subtitle')}
-        action={
-          <>
-            <button
-              onClick={() => void reset()}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors hover:bg-red-500/10"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              <Trash2 className="h-4 w-4" /> {t('reset')}
-            </button>
-            <button
-              onClick={() => void scanAll()}
-              disabled={scanning}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              style={{ background: 'var(--accent)' }}
-            >
-              {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              {scanning ? t('scanning') : scannedSomething ? t('rescanAllButton') : t('scanAllButton')}
-            </button>
-          </>
-        }
-      />
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {/* Actions — the page header owns the title and the view switcher, so the
+          risk-specific scan controls live with the risk content. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          onClick={() => void reset()}
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors hover:bg-red-500/10"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <Trash2 className="h-4 w-4" /> {t('reset')}
+        </button>
+        <button
+          onClick={() => void scanAll()}
+          disabled={scanning}
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          style={{ background: 'var(--accent)' }}
+        >
+          {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          {scanning ? t('scanning') : scannedSomething ? t('rescanAllButton') : t('scanAllButton')}
+        </button>
+      </div>
 
-      {error && <div className="px-6 pt-3"><ErrorAlert message={error} /></div>}
+      {error && <ErrorAlert message={error} />}
 
-      <div className="px-6 pt-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-4" style={{ background: hero.bg }}>
-          <div className="flex items-center gap-3">
-            <hero.Icon className="h-6 w-6" style={{ color: hero.tone }} strokeWidth={1.8} />
-            <div>
-              <p className="text-[15px] font-semibold text-zinc-100">{hero.title}</p>
-              <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('scanAllHint')}</p>
-            </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-4" style={{ background: hero.bg }}>
+        <div className="flex items-center gap-3">
+          <hero.Icon className="h-6 w-6" style={{ color: hero.tone }} strokeWidth={1.8} />
+          <div>
+            <p className="text-[15px] font-semibold text-zinc-100">{hero.title}</p>
+            <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('scanAllHint')}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <SeverityPill color="#ef4444" label={t('highRisk')} count={counts.high} />
-            <SeverityPill color="#f59e0b" label={t('mediumRisk')} count={counts.medium} />
-            <SeverityPill color="#22c55e" label={t('lowRisk')} count={counts.low} />
-            <SeverityPill color="var(--text-faint)" label={t('untested')} count={counts.untested} />
-            {scanning && (
-              <span className="flex items-center gap-1.5 text-zinc-300">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {job?.state === 'running' ? t('jobScanning', { checked: job.checked, total: job.total }) : t('scanning')}
-              </span>
-            )}
-            {!scanning && job?.state === 'done' && (
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <Activity className="h-3.5 w-3.5" /> {t('jobDone')}
-              </span>
-            )}
-          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <SeverityPill color="#ef4444" label={t('highRisk')} count={counts.high} />
+          <SeverityPill color="#f59e0b" label={t('mediumRisk')} count={counts.medium} />
+          <SeverityPill color="#22c55e" label={t('lowRisk')} count={counts.low} />
+          <SeverityPill color="var(--text-faint)" label={t('untested')} count={counts.untested} />
+          {scanning && (
+            <span className="flex items-center gap-1.5 text-zinc-300">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {job?.state === 'running' ? t('jobScanning', { checked: job.checked, total: job.total }) : t('scanning')}
+            </span>
+          )}
+          {!scanning && job?.state === 'done' && (
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <Activity className="h-3.5 w-3.5" /> {t('jobDone')}
+            </span>
+          )}
         </div>
       </div>
 
@@ -257,7 +250,7 @@ export function SecurityPage() {
       )}
 
       {hasResults && (
-        <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
@@ -349,11 +342,11 @@ export function SecurityPage() {
 
               <div className="min-h-0 overflow-y-auto rounded-xl p-4" style={{ background: 'var(--bg-subtle-2)' }}>
                 {selected ? (
-                  <DeviceDetail
+                  <DeviceRiskDetail
                     device={selected}
                     kindLabels={kindLabels}
                     unknownLabel={unknownLabel}
-                    onOpenInDevices={() => openInDevices(selected)}
+                    onOpenInventory={() => onOpenInventory(selected.deviceId)}
                   />
                 ) : (
                   <EmptyState title={t('detailEmpty')} description={t('detailEmptyDesc')} icon={Shield} />
@@ -420,11 +413,11 @@ function SeverityPill({ color, label, count }: { color: string; label: string; c
   )
 }
 
-function DeviceDetail({ device, kindLabels, unknownLabel, onOpenInDevices }: {
+function DeviceRiskDetail({ device, kindLabels, unknownLabel, onOpenInventory }: {
   device: DeviceSecurityResult
   kindLabels: Record<string, string>
   unknownLabel: string
-  onOpenInDevices: () => void
+  onOpenInventory: () => void
 }) {
   const { t } = useTranslation('security')
   const probing = useSecurityStore((s) => s.probing)
@@ -488,7 +481,7 @@ function DeviceDetail({ device, kindLabels, unknownLabel, onOpenInDevices }: {
           {isProbing ? t('scanning') : t('probeRow')}
         </button>
         <button
-          onClick={onOpenInDevices}
+          onClick={onOpenInventory}
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11.5px] font-medium transition-all"
           style={{ border: '1px solid var(--border-strong)', color: 'var(--text-primary)' }}
         >

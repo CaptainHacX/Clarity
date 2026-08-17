@@ -15,7 +15,9 @@ const STATUS_FILTER_KEY = 'clarity.devices.statusFilter'
 const DEMO_MODE_KEY = 'clarity.devices.demoMode'
 
 export type DeviceStatusFilter = 'all' | 'online' | 'offline'
-export type DeviceDetailTab = 'general' | 'ports' | 'history' | 'local'
+// 'local' is gone: local services moved to the Ports page, where the port table
+// already enumerates this machine's sockets with more detail.
+export type DeviceDetailTab = 'general' | 'ports' | 'history'
 
 function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   try {

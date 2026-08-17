@@ -18,15 +18,13 @@ import { DuplicateFinderPage } from './pages/DuplicateFinderPage'
 import { LargeFileFinderPage } from './pages/LargeFileFinderPage'
 import { EmptyFolderCleanerPage } from './pages/EmptyFolderCleanerPage'
 import { FileShredderPage } from './pages/FileShredderPage'
-import { PortManagerPage } from './pages/PortManagerPage'
+import { PortsPage } from './pages/PortsPage'
 import { DiskRepairPage } from './pages/DiskRepairPage'
 import { DiskMaintenancePage } from './pages/DiskMaintenancePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { NetworkCleanupPage } from './pages/NetworkCleanupPage'
-import { NetworkSecurityPage } from './pages/NetworkSecurityPage'
 import { WifiPage } from './pages/WifiPage'
 import { DevicesPage } from './pages/DevicesPage'
-import { SecurityPage } from './pages/SecurityPage'
 import { SystemHealthReportPage } from './pages/SystemHealthReportPage'
 import { MalwareScannerPage } from './pages/MalwareScannerPage'
 import { ThreatMonitorPage } from './pages/ThreatMonitorPage'
@@ -164,14 +162,12 @@ export function App() {
           <Route path="/large-files" element={<LargeFileFinderPage />} />
           <Route path="/empty-folders" element={<EmptyFolderCleanerPage />} />
           <Route path="/file-shredder" element={<FileShredderPage />} />
-          <Route path="/port-manager" element={<PortManagerPage />} />
+          <Route path="/ports" element={<PortsPage />} />
           <Route path="/disk-repair" element={<DiskRepairPage />} />
           <Route path="/disk-maintenance" element={<DiskMaintenancePage />} />
-          <Route path="/network" element={<NetworkCleanupPage />} />
-          <Route path="/network-security" element={<NetworkSecurityPage />} />
+          <Route path="/network-cleanup" element={<NetworkCleanupPage />} />
           <Route path="/wifi" element={<WifiPage />} />
           <Route path="/devices" element={<DevicesPage />} />
-          <Route path="/security" element={<SecurityPage />} />
           <Route path="/health-report" element={<SystemHealthReportPage />} />
           <Route path="/malware" element={<MalwareScannerPage />} />
           <Route path="/threat-monitor" element={<ThreatMonitorPage />} />
@@ -189,8 +185,14 @@ export function App() {
           <Route path="/debloater" element={<DebloaterPage />} />
           <Route path="/updates" element={<SoftwareUpdaterPage />} />
           <Route path="/schedules" element={<SchedulesPage />} />
-          {/* Legacy redirect */}
+          {/* Legacy redirects */}
           <Route path="/hardening" element={<Navigate to="/privacy" replace />} />
+          {/* The Network section collapsed from six pages to four. These keep
+              bookmarks, tray navigation, and any deep link still working. */}
+          <Route path="/network" element={<Navigate to="/network-cleanup" replace />} />
+          <Route path="/network-security" element={<Navigate to="/wifi" replace />} />
+          <Route path="/security" element={<Navigate to="/devices" replace />} />
+          <Route path="/port-manager" element={<Navigate to="/ports" replace />} />
           <Route path="/updater" element={<SoftwareUpdaterPage />} />
           <Route path="/drivers" element={<DriverManagerPage />} />
         </Routes>
@@ -227,14 +229,12 @@ const ROUTE_TITLES: Record<string, { key: string; ns?: string } | string> = {
   '/large-files': 'Large File Finder',
   '/empty-folders': 'Empty Folder Cleaner',
   '/file-shredder': 'File Shredder',
-  '/port-manager': 'Port Manager',
+  '/ports': 'Ports',
   '/disk-repair': 'Disk Repair',
   '/disk-maintenance': 'Disk Maintenance',
-  '/network': { key: 'network' },
-  '/network-security': 'WiFi & Network Security',
+  '/network-cleanup': { key: 'networkCleanup' },
   '/wifi': 'Wi-Fi',
   '/devices': 'Devices',
-  '/security': 'Security',
   '/health-report': 'System Health Report',
   '/malware': { key: 'malwareScanner' },
   '/threat-monitor': { key: 'threatMonitor' },

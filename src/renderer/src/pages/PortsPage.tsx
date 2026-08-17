@@ -19,9 +19,23 @@ import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { LocalServicesPanel } from '@/components/network/ports/LocalServicesPanel'
 import { usePortManagerStore } from '@/stores/port-manager-store'
-import { usePlatform } from '@/hooks/usePlatform'
+import { useDevicesStore } from '@/stores/devices-store'
 import type { PortEntry } from '@shared/types'
+
+/**
+ * Ports — local listening ports and connections, with the ability to end the
+ * process holding one.
+ *
+ * Also carries the "local services" split (reachable from the network vs only
+ * from this machine) that used to be a tab inside the Devices page. It belongs
+ * here: it describes this machine's own sockets, which is exactly what the port
+ * table already enumerates.
+ *
+ * Available on all three platforms — Windows enumerates through netstat, see
+ * `port-monitor.ts`.
+ */
 
 const REFRESH_OPTIONS = [0, 2000, 5000, 10000] as const
 
@@ -68,38 +82,63 @@ function StatChip({ icon: Icon, label, value, color }: {
   )
 }
 
-function PortManagerPageContent() {
+export function PortsPage() {
   const { t } = useTranslation('portManager')
-  const store = usePortManagerStore()
+
+  // Subscribed per field rather than through a bare usePortManagerStore(): the
+  // selectorless form re-rendered this whole table (and every row) on any store
+  // change, including each keystroke in the search box.
+  const status = usePortManagerStore((s) => s.status)
+  const error = usePortManagerStore((s) => s.error)
+  const result = usePortManagerStore((s) => s.result)
+  const filter = usePortManagerStore((s) => s.filter)
+  const search = usePortManagerStore((s) => s.search)
+  const selectedPids = usePortManagerStore((s) => s.selectedPids)
+  const killInFlight = usePortManagerStore((s) => s.killInFlight)
+  const scan = usePortManagerStore((s) => s.scan)
+  const setFilter = usePortManagerStore((s) => s.setFilter)
+  const setSearch = usePortManagerStore((s) => s.setSearch)
+  const togglePid = usePortManagerStore((s) => s.togglePid)
+  const selectAll = usePortManagerStore((s) => s.selectAll)
+  const deselectAll = usePortManagerStore((s) => s.deselectAll)
+  const killSelected = usePortManagerStore((s) => s.killSelected)
+
+  // Read-only: hosts-file names to enrich local services, used only if a
+  // devices scan already happened. Never triggers one.
+  const localListeners = useDevicesStore((s) => s.snapshot?.listeners)
+  const devicesDemoMode = useDevicesStore((s) => s.demoMode)
+
   const [showConfirm, setShowConfirm] = useState(false)
   const [refreshMs, setRefreshMs] = useState<number>(5000)
   const [sortBy, setSortBy] = useState<'port' | 'process'>('port')
   const [sortAsc, setSortAsc] = useState(true)
 
   useEffect(() => {
-    if (store.status === 'idle') store.scan()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (usePortManagerStore.getState().status === 'idle') void scan()
+  }, [scan])
 
-  // Auto-refresh interval
+  // Auto-refresh. Status is read at fire time instead of being a dependency:
+  // every scan flips it, so having it in the deps tore the interval down and
+  // rebuilt it on each pass, which meant the timer never actually elapsed at
+  // the configured rate.
   useEffect(() => {
     if (refreshMs <= 0) return
     const id = setInterval(() => {
-      if (store.status !== 'scanning') store.scan()
+      const store = usePortManagerStore.getState()
+      if (store.status !== 'scanning') void store.scan()
     }, refreshMs)
     return () => clearInterval(id)
-  }, [refreshMs, store.status])
+  }, [refreshMs])
 
   const filtered = useMemo(() => {
-    const result = store.result
     if (!result) return []
     let list = result.ports.filter((entry) => {
-      if (store.filter === 'listening' && !entry.isListener) return false
-      if (store.filter === 'tcp' && entry.protocol !== 'tcp') return false
-      if (store.filter === 'udp' && entry.protocol !== 'udp') return false
+      if (filter === 'listening' && !entry.isListener) return false
+      if (filter === 'tcp' && entry.protocol !== 'tcp') return false
+      if (filter === 'udp' && entry.protocol !== 'udp') return false
       return true
     })
-    const query = store.search.trim().toLowerCase()
+    const query = search.trim().toLowerCase()
     if (query) {
       list = list.filter((entry) =>
         String(entry.port).includes(query) ||
@@ -117,12 +156,12 @@ function PortManagerPageContent() {
       return a.protocol.localeCompare(b.protocol) * dir
     })
     return list
-  }, [store.result, store.filter, store.search, sortBy, sortAsc])
+  }, [result, filter, search, sortBy, sortAsc])
 
   const selectedEntries = useMemo(() => {
-    if (!store.result) return []
-    return store.result.ports.filter((e) => e.pid != null && store.selectedPids.has(e.pid))
-  }, [store.result, store.selectedPids])
+    if (!result) return []
+    return result.ports.filter((e) => e.pid != null && selectedPids.has(e.pid))
+  }, [result, selectedPids])
 
   const toggleSort = (by: 'port' | 'process') => {
     if (sortBy === by) setSortAsc((v) => !v)
@@ -131,12 +170,12 @@ function PortManagerPageContent() {
 
   const handleKill = async () => {
     setShowConfirm(false)
-    const res = await store.killSelected()
+    const res = await killSelected()
     if (res.success) {
       if (res.freedPorts.length > 0) {
         toast.success(t('killFreed', { count: res.freedPorts.length }))
       } else {
-        toast.success(t('killSuccess', { count: store.selectedPids.size }))
+        toast.success(t('killSuccess', { count: selectedEntries.length }))
       }
     } else {
       toast.error(res.requiresAdmin ? t('killAdminNeeded') : res.error || t('killFailed'))
@@ -144,20 +183,17 @@ function PortManagerPageContent() {
   }
 
   const rowKey = (e: PortEntry) => `${e.protocol}:${e.port}:${e.pid ?? 'kernel'}`
-  const inFlight = store.killInFlight
-  const scanning = store.status === 'scanning'
-  const result = store.result
+  const scanning = status === 'scanning'
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Header */}
       <PageHeader
         className="mb-5"
         title={t('pageTitle')}
         description={t('pageDescription')}
         action={
           <button
-            onClick={() => store.scan()}
+            onClick={() => void scan()}
             disabled={scanning}
             className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-40"
             style={{
@@ -172,12 +208,23 @@ function PortManagerPageContent() {
       />
 
       {/* Stats */}
-      {result && store.status !== 'error' && (
+      {result && status !== 'error' && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatChip icon={Network} label={t('ports')} value={String(result.totalPorts)} color="#60a5fa" />
           <StatChip icon={Radio} label={t('listeningTab')} value={String(result.listeners)} color="#4ade80" />
           <StatChip icon={Activity} label={t('connections')} value={String(result.connections)} color="#c084fc" />
           <StatChip icon={Clock} label={t('lastScan')} value={formatDuration(result.duration)} color="#f59e0b" />
+        </div>
+      )}
+
+      {/* Local services — exposure summary, relocated from the Devices page */}
+      {result && status !== 'error' && result.ports.length > 0 && (
+        <div className="mb-4">
+          <LocalServicesPanel
+            ports={result.ports}
+            listeners={localListeners}
+            demoMode={devicesDemoMode}
+          />
         </div>
       )}
 
@@ -187,12 +234,12 @@ function PortManagerPageContent() {
           {([['all', t('allTab')], ['listening', t('listeningTab')], ['tcp', t('tcpTab')], ['udp', t('udpTab')]] as const).map(([key, label]) => (
             <button
               key={key}
-              onClick={() => store.setFilter(key)}
+              onClick={() => setFilter(key)}
               className={cn(
                 'rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors',
-                store.filter === key ? 'text-white' : 'text-[var(--text-muted)]'
+                filter === key ? 'text-white' : 'text-[var(--text-muted)]'
               )}
-              style={store.filter === key ? { background: 'var(--bg-subtle-2)' } : undefined}
+              style={filter === key ? { background: 'var(--bg-subtle-2)' } : undefined}
             >
               {label}
             </button>
@@ -202,15 +249,15 @@ function PortManagerPageContent() {
         <div className="relative min-w-[160px] flex-1 max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
           <input
-            value={store.search}
-            onChange={(e) => store.setSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={t('searchPlaceholder')}
             className="w-full rounded-xl border py-2 pl-9 pr-8 text-[13px] outline-none transition-colors"
             style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
           />
-          {store.search && (
+          {search && (
             <button
-              onClick={() => store.setSearch('')}
+              onClick={() => setSearch('')}
               className="absolute right-2 top-1/2 -translate-y-1/2"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Clear search"
@@ -240,14 +287,14 @@ function PortManagerPageContent() {
         {result && (
           <>
             <button
-              onClick={() => store.selectAll()}
+              onClick={() => selectAll()}
               className="text-[12px] font-medium transition-colors hover:text-white"
               style={{ color: 'var(--text-muted)' }}
             >
               {t('selectAll')}
             </button>
             <button
-              onClick={() => store.deselectAll()}
+              onClick={() => deselectAll()}
               className="text-[12px] font-medium transition-colors hover:text-white"
               style={{ color: 'var(--text-muted)' }}
             >
@@ -255,7 +302,7 @@ function PortManagerPageContent() {
             </button>
             <button
               onClick={() => setShowConfirm(true)}
-              disabled={store.selectedPids.size === 0 || inFlight.size > 0}
+              disabled={selectedPids.size === 0 || killInFlight.size > 0}
               className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-40"
               style={{
                 background: 'rgba(239,68,68,0.12)',
@@ -263,10 +310,10 @@ function PortManagerPageContent() {
               }}
             >
               <Square className="h-3.5 w-3.5" />
-              {inFlight.size > 0 ? t('ending') : t('endSelected')}
-              {store.selectedPids.size > 0 && (
+              {killInFlight.size > 0 ? t('ending') : t('endSelected')}
+              {selectedPids.size > 0 && (
                 <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(239,68,68,0.2)' }}>
-                  {store.selectedPids.size}
+                  {selectedPids.size}
                 </span>
               )}
             </button>
@@ -275,7 +322,7 @@ function PortManagerPageContent() {
       </div>
 
       {/* Body */}
-      {store.status === 'idle' && (
+      {status === 'idle' && (
         <EmptyState icon={Network} title={t('idleTitle')} description={t('idleDescription')} />
       )}
 
@@ -285,15 +332,15 @@ function PortManagerPageContent() {
         </div>
       )}
 
-      {store.status === 'error' && (
-        <EmptyState icon={ShieldAlert} title={t('errorTitle')} description={store.error ?? ''} />
+      {status === 'error' && (
+        <EmptyState icon={ShieldAlert} title={t('errorTitle')} description={error ?? ''} />
       )}
 
-      {store.status === 'complete' && filtered.length === 0 && (
+      {status === 'complete' && filtered.length === 0 && (
         <EmptyState icon={Network} title={t('emptyTitle')} description={t('emptyDescription')} />
       )}
 
-      {store.status === 'complete' && filtered.length > 0 && (
+      {status === 'complete' && filtered.length > 0 && (
         <div
           className="min-h-0 flex-1 overflow-y-auto rounded-2xl border"
           style={{
@@ -312,8 +359,8 @@ function PortManagerPageContent() {
                 <th className="w-10 px-4 py-3 font-semibold">
                   <input
                     type="checkbox"
-                    checked={filtered.length > 0 && filtered.every((e) => e.pid == null || store.selectedPids.has(e.pid))}
-                    onChange={(e) => e.target.checked ? store.selectAll() : store.deselectAll()}
+                    checked={filtered.length > 0 && filtered.every((e) => e.pid == null || selectedPids.has(e.pid))}
+                    onChange={(e) => e.target.checked ? selectAll() : deselectAll()}
                     aria-label={t('selectAll')}
                   />
                 </th>
@@ -354,9 +401,9 @@ function PortManagerPageContent() {
                     {entry.pid != null ? (
                       <input
                         type="checkbox"
-                        checked={store.selectedPids.has(entry.pid)}
-                        onChange={() => store.togglePid(entry.pid!)}
-                        disabled={inFlight.has(entry.pid)}
+                        checked={selectedPids.has(entry.pid)}
+                        onChange={() => togglePid(entry.pid!)}
+                        disabled={killInFlight.has(entry.pid)}
                         aria-label={`${entry.processName ?? entry.pid} (${entry.port})`}
                       />
                     ) : null}
@@ -454,19 +501,4 @@ function PortManagerPageContent() {
       />
     </div>
   )
-}
-
-export function PortManagerPage() {
-  const { features } = usePlatform()
-  const { t } = useTranslation('portManager')
-
-  if (!features.portManager) {
-    return (
-      <div className="animate-fade-in">
-        <PageHeader title={t('pageTitle')} description={t('pageDescription')} />
-        <EmptyState icon={Network} title={t('unavailableTitle')} description={t('unavailableDescription')} />
-      </div>
-    )
-  }
-  return <PortManagerPageContent />
 }

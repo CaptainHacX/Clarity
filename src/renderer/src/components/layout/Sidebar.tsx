@@ -37,9 +37,7 @@ import {
   Network,
   RadioTower,
   MonitorSmartphone,
-  Lock,
   FileText,
-  ShieldCheck,
   Sun,
   Moon,
 } from 'lucide-react'
@@ -107,14 +105,15 @@ const navGroups: NavGroup[] = [
       { icon: Database, labelKey: 'registry', path: '/registry' },
       { icon: Zap, labelKey: 'startup', path: '/startup' },
       {
-        icon: Wifi, labelKey: 'network', path: '/network',
+        // Parent points at its first child. It used to be '/network', which was
+        // also the Network Cleanup child's path — so the group and one of its
+        // children collided on the same route.
+        icon: Wifi, labelKey: 'network', path: '/wifi',
         children: [
           { icon: RadioTower, labelKey: 'wifi', path: '/wifi' },
           { icon: MonitorSmartphone, labelKey: 'devices', path: '/devices' },
-          { icon: ShieldCheck, labelKey: 'security', path: '/security' },
-          { icon: Wifi, labelKey: 'networkCleanup', path: '/network' },
-          { icon: Lock, label: 'WiFi & Network Security', path: '/network-security' },
-          { icon: Network, labelKey: 'portManager', path: '/port-manager' },
+          { icon: Network, labelKey: 'portManager', path: '/ports' },
+          { icon: Eraser, labelKey: 'networkCleanup', path: '/network-cleanup' },
         ]
       },
       {
@@ -212,7 +211,8 @@ export function Sidebar() {
         if (child.path === '/drivers' && !features.drivers) return false
         if (child.path === '/context-menu' && !features.contextMenu) return false
         if (child.path === '/firewall' && !features.firewallAudit) return false
-        if (child.path === '/port-manager' && !features.portManager) return false
+        // /ports works on all three platforms — Windows enumerates via netstat.
+        if (child.path === '/ports' && !features.portManager) return false
         if (child.path === '/threat-monitor' && !(threatMonitorLoaded && threatBlacklistActive)) return false
         // /cve works locally (free NVD scanner), so it's always visible
         return true

@@ -31,6 +31,7 @@ import {
   Search,
   Server,
   ShieldAlert,
+  ShieldCheck,
   Speaker,
   Square,
   Tablet,
@@ -43,6 +44,7 @@ import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorAlert } from '@/components/shared/ErrorAlert'
+import { RiskView } from '@/components/network/risk/RiskView'
 import { cn } from '@/lib/utils'
 import { useDevicesStore, type DeviceDetailTab, type DeviceStatusFilter } from '@/stores/devices-store'
 import { useSecurityStore } from '@/stores/security-store'
@@ -173,6 +175,9 @@ function SectionCard({ title, icon: Icon, action, children }: {
 
 export function DevicesPage() {
   const { t } = useTranslation('devices')
+  // The Risk view keeps its own namespace, so its label comes from there rather
+  // than from a new key that would need translating into 30 locales.
+  const { t: tSecurity } = useTranslation('security')
   const snapshot = useDevicesStore((s) => s.snapshot)
   const scanning = useDevicesStore((s) => s.scanning)
   const error = useDevicesStore((s) => s.error)
@@ -195,9 +200,26 @@ export function DevicesPage() {
 
   const securityStart = useSecurityStore((s) => s.start)
   const securityStop = useSecurityStore((s) => s.stop)
+  const setRiskSelected = useSecurityStore((s) => s.setSelected)
 
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [menu, setMenu] = useState<{ device: NetworkDevice; x: number; y: number } | null>(null)
+  // Inventory is "what is on my network"; Risk is "what about it is exposed".
+  // The two used to be separate pages that navigated at each other.
+  const [view, setView] = useState<'inventory' | 'risk'>('inventory')
+
+  /** Risk → Inventory, landing on that device's Ports tab. */
+  const openInventoryPorts = useCallback((deviceId: string): void => {
+    setSelected(deviceId)
+    useDevicesStore.getState().setDetailTab('ports')
+    setView('inventory')
+  }, [setSelected])
+
+  /** Inventory → Risk, focused on the device the user was looking at. */
+  const openRiskFor = useCallback((deviceId: string): void => {
+    setRiskSelected(deviceId)
+    setView('risk')
+  }, [setRiskSelected])
 
   useEffect(() => {
     if (!hasScanned) {
@@ -288,6 +310,11 @@ export function DevicesPage() {
     { id: 'offline', label: t('offline'), count: counts.offline },
   ]
 
+  const VIEWS: Array<{ id: 'inventory' | 'risk'; label: string }> = [
+    { id: 'inventory', label: t('title') },
+    { id: 'risk', label: tSecurity('title') },
+  ]
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-8">
       <PageHeader
@@ -337,6 +364,26 @@ export function DevicesPage() {
         }
       />
 
+      {/* Inventory | Risk. Two lenses on one device set, so they share this page
+          instead of navigating at each other across two sidebar entries. */}
+      <div className="flex items-center gap-1 self-start rounded-lg p-0.5" style={{ background: 'var(--bg-subtle-2)' }}>
+        {VIEWS.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setView(v.id)}
+            aria-pressed={view === v.id}
+            className="rounded-md px-3 py-1.5 text-[12px] font-semibold transition-colors"
+            style={
+              view === v.id
+                ? { background: 'var(--accent)', color: '#fff' }
+                : { color: 'var(--text-muted)' }
+            }
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
       {error && <ErrorAlert message={error} onDismiss={() => useDevicesStore.setState({ error: null })} />}
 
       {alertsOpen && (
@@ -347,13 +394,15 @@ export function DevicesPage() {
         />
       )}
 
-      {snapshot && <NetworkPanel snapshot={snapshot} demoMode={demoMode} />}
+      {view === 'risk' && <RiskView onOpenInventory={openInventoryPorts} />}
 
-      {!snapshot && !error && (
+      {view === 'inventory' && snapshot && <NetworkPanel snapshot={snapshot} demoMode={demoMode} />}
+
+      {view === 'inventory' && !snapshot && !error && (
         <EmptyState icon={Radar} title={t('emptyTitle')} description={t('emptyDesc')} />
       )}
 
-      {snapshot && (
+      {view === 'inventory' && snapshot && (
         <div className="flex flex-col gap-5 lg:flex-row">
           {/* ── Device list ───────────────────────────── */}
           <div className="glass-card min-w-0 flex-1 rounded-2xl p-4">
@@ -413,7 +462,13 @@ export function DevicesPage() {
           {/* ── Detail pane ───────────────────────────── */}
           <div className="w-full shrink-0 lg:w-[460px]">
             {selected ? (
-              <DeviceDetail device={selected} label={nameOf(selected)} snapshot={snapshot} demoMode={demoMode} />
+              <DeviceDetail
+                device={selected}
+                label={nameOf(selected)}
+                snapshot={snapshot}
+                demoMode={demoMode}
+                onOpenRisk={openRiskFor}
+              />
             ) : (
               <EmptyState icon={Radar} title={t('detailEmpty')} description={t('detailEmptyDesc')} />
             )}
@@ -658,21 +713,23 @@ function AlertsInbox({ events, onClose, onClear }: {
 // Detail panel
 // ─────────────────────────────────────────────────────────────
 
-function DeviceDetail({ device, label, snapshot, demoMode }: {
+function DeviceDetail({ device, label, snapshot, demoMode, onOpenRisk }: {
   device: NetworkDevice
   label: string
   snapshot: DevicesSnapshot
   demoMode: boolean
+  onOpenRisk: (deviceId: string) => void
 }) {
   const { t } = useTranslation('devices')
   const detailTab = useDevicesStore((s) => s.detailTab)
   const setDetailTab = useDevicesStore((s) => s.setDetailTab)
 
+  // Local Services moved to the Ports page, where the port table already
+  // enumerates this machine's sockets in more detail.
   const tabs: Array<{ id: DeviceDetailTab; label: string; show: boolean }> = [
     { id: 'general', label: t('tabGeneral'), show: true },
     { id: 'ports', label: t('tabPorts'), show: true },
     { id: 'history', label: t('tabHistory'), show: true },
-    { id: 'local', label: t('tabLocalServices'), show: device.isLocal },
   ]
   const visible = tabs.filter((tab) => tab.show)
   const active = visible.some((tab) => tab.id === detailTab) ? detailTab : 'general'
@@ -700,9 +757,8 @@ function DeviceDetail({ device, label, snapshot, demoMode }: {
       </div>
 
       {active === 'general' && <GeneralTab device={device} snapshot={snapshot} demoMode={demoMode} />}
-      {active === 'ports' && <PortsTab device={device} />}
+      {active === 'ports' && <PortsTab device={device} onOpenRisk={onOpenRisk} />}
       {active === 'history' && <HistoryTab device={device} />}
-      {active === 'local' && <LocalServicesTab listeners={snapshot.listeners} demoMode={demoMode} />}
     </div>
   )
 }
@@ -1070,8 +1126,9 @@ function GeneralTab({ device, snapshot, demoMode }: { device: NetworkDevice; sna
 
 type PortFilter = 'all' | DevicePortState
 
-function PortsTab({ device }: { device: NetworkDevice }) {
+function PortsTab({ device, onOpenRisk }: { device: NetworkDevice; onOpenRisk: (deviceId: string) => void }) {
   const { t } = useTranslation('devices')
+  const { t: tSecurity } = useTranslation('security')
   const snapshot = useSecurityStore((s) => s.snapshot)
   const probing = useSecurityStore((s) => s.probing)
   const scanDevice = useSecurityStore((s) => s.scanDevice)
@@ -1124,18 +1181,32 @@ function PortsTab({ device }: { device: NetworkDevice }) {
         title={t('portStateTitle')}
         icon={ShieldAlert}
         action={
-          <button
-            onClick={() => {
-              if (!ip) return
-              void scanDevice(ip).then((ok) => (ok ? toast.success(t('portsProbed')) : toast.error(t('portsProbeFailed'))))
-            }}
-            disabled={!ip || isProbing}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-all disabled:opacity-40"
-            style={{ border: '1px solid var(--border-strong)', color: 'var(--text-primary)' }}
-          >
-            {isProbing ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldAlert className="h-3 w-3" strokeWidth={2} />}
-            {isProbing ? t('portsProbing') : t('probePortsButton')}
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* Counterpart to the Risk view's "open ports" button: the two views
+                now hand off in-page rather than navigating between routes. */}
+            {result && (
+              <button
+                onClick={() => onOpenRisk(result.deviceId)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-all"
+                style={{ border: '1px solid var(--border-strong)', color: 'var(--text-primary)' }}
+              >
+                <ShieldCheck className="h-3 w-3" strokeWidth={2} />
+                {tSecurity('riskInspectorTitle')}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (!ip) return
+                void scanDevice(ip).then((ok) => (ok ? toast.success(t('portsProbed')) : toast.error(t('portsProbeFailed'))))
+              }}
+              disabled={!ip || isProbing}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-all disabled:opacity-40"
+              style={{ border: '1px solid var(--border-strong)', color: 'var(--text-primary)' }}
+            >
+              {isProbing ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldAlert className="h-3 w-3" strokeWidth={2} />}
+              {isProbing ? t('portsProbing') : t('probePortsButton')}
+            </button>
+          </div>
         }
       >
         {catalog.length === 0 ? (
@@ -1551,47 +1622,3 @@ function HistoryTab({ device }: { device: NetworkDevice }) {
   )
 }
 
-// ─── Local services (This Mac only) ─────────────────────────
-
-function LocalServicesTab({ listeners, demoMode }: { listeners: LocalListener[]; demoMode: boolean }) {
-  const { t } = useTranslation('devices')
-  const loopback = listeners.filter((l) => l.loopbackOnly)
-  const reachable = listeners.filter((l) => !l.loopbackOnly)
-
-  const Group = ({ title, hint, rows }: { title: string; hint: string; rows: LocalListener[] }) => (
-    <SectionCard title={title} icon={Server}>
-      <p className="mb-2 text-[11px] leading-relaxed" style={{ color: 'var(--text-faint)' }}>{hint}</p>
-      {rows.length === 0 ? (
-        <p className="text-[12px]" style={{ color: 'var(--text-faint)' }}>{t('localServicesEmpty')}</p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {rows.map((l) => (
-            <div key={`${l.port}-${l.pid}`} className="flex items-center justify-between gap-2 rounded-lg px-3 py-1.5" style={{ background: 'var(--bg-subtle)' }}>
-              <div className="min-w-0">
-                <p className="truncate text-[12px] text-zinc-200">
-                  {demoMode ? t('maskedValue') : l.process ?? t('unknownValue')}
-                  {!demoMode && l.pid != null && (
-                    <span className="ml-1.5 text-[10px]" style={{ color: 'var(--text-faint)' }}>PID {l.pid}</span>
-                  )}
-                </p>
-                {!demoMode && l.hostNames.length > 0 && (
-                  <p className="truncate text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                    {l.hostNames.slice(0, 3).map((h) => `${h}:${l.port}`).join(' · ')}
-                  </p>
-                )}
-              </div>
-              <span className="shrink-0 font-mono text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{l.port}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </SectionCard>
-  )
-
-  return (
-    <>
-      <Group title={t('localOnlyTitle')} hint={t('localOnlyHint')} rows={loopback} />
-      <Group title={t('localReachableTitle')} hint={t('localReachableHint')} rows={reachable} />
-    </>
-  )
-}

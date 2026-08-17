@@ -74,7 +74,9 @@ export function NetworkCleanupPage() {
       toast.error(t('scanFailedToast'))
       useNetworkStore.getState().setStatus('idle')
     }
-  }, [])
+    // `t` belongs here: without it the callback keeps the translator captured at
+    // mount, so a failure after switching language showed the old language.
+  }, [t])
 
   const handleClean = useCallback(async () => {
     setShowConfirm(false)
@@ -130,7 +132,7 @@ export function NetworkCleanupPage() {
       toast.error(t('cleanupFailedToast'))
       useNetworkStore.getState().setStatus('idle')
     }
-  }, [historyStore, recomputeStats])
+  }, [historyStore, recomputeStats, t])
 
   const isScanning = status === 'scanning'
   const isCleaning = status === 'cleaning'
