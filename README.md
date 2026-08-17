@@ -20,7 +20,7 @@
     Build:     <a href="https://github.com/CaptainHacX/Clarity/actions"><img src="https://img.shields.io/github/actions/workflow/status/CaptainHacX/Clarity/release.yml?style=flat-square&label=Build" alt="Build" /></a>
   -->
   <img src="https://img.shields.io/badge/Stars-Open%20Source-blue?style=flat-square" alt="Stars" />
-  <img src="https://img.shields.io/badge/Release-v1.0.3-blue?style=flat-square" alt="Release" />
+  <img src="https://img.shields.io/badge/Release-v1.1.0-blue?style=flat-square" alt="Release" />
   <img src="https://img.shields.io/badge/Downloads-Free-blue?style=flat-square" alt="Downloads" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Build-Passing-blue?style=flat-square" alt="Build" />
@@ -63,11 +63,11 @@
 
 Grab the latest installer for your platform from [GitHub Releases](https://github.com/CaptainHacX/Clarity/releases):
 
-| Platform | Format | Direct download (v1.0.3) |
+| Platform | Format | Direct download (v1.1.0) |
 |----------|--------|--------------------------|
-| **Windows** | `.exe` installer | [Clarity-Setup-1.0.3.exe](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-Setup-1.0.3.exe) |
-| **macOS** | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-arm64.dmg) |
-| **Linux** | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-amd64.deb) |
+| **Windows** | `.exe` installer | [Clarity-Setup-1.1.0.exe](https://github.com/CaptainHacX/Clarity/releases/download/v1.1.0/Clarity-Setup-1.1.0.exe) |
+| **macOS** | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.1.0/Clarity-1.1.0-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.1.0/Clarity-1.1.0-prod-arm64.dmg) |
+| **Linux** | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.1.0/Clarity-1.1.0-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.1.0/Clarity-1.1.0-prod-amd64.deb) |
 
 > **macOS note:** Clarity is **ad-hoc signed** but not notarized with an Apple Developer ID
 > (that requires a paid Apple Developer account, which the project doesn't fund yet).
@@ -96,10 +96,26 @@ Most system cleaners are closed-source, ad-filled, and want your money — some 
 Clarity is **100% free, open-source, and transparent**. No ads, no upsells, no telemetry. You can read every line of code, audit every scan, and verify every delete.
 
 - **Free & open source** — MIT licensed, no paid tiers, no dark patterns.
-- **Privacy-first** — runs entirely on your machine; nothing is ever uploaded.
+- **Privacy-first** — no accounts, no telemetry, no analytics. Cleaning and scanning run on your machine; see [Network activity](#network-activity) for the few features that need the internet.
 - **Auditable** — cleaning targets are plain JSON files anyone can review.
 - **Cross-platform** — Windows, macOS, and Linux with identical cleaning coverage.
 - **30 languages** — fully localized, with a scriptable CLI for power users.
+
+### Network activity
+
+Clarity has no telemetry and no analytics, and it never transmits your files,
+scan results, or cleaning history. Four features do reach the network, each only
+when you use it:
+
+| Feature | Host | What leaves your machine |
+| --- | --- | --- |
+| Vulnerability scan | `services.nvd.nist.gov` | The vendor and product name of each recognised installed app, as a CPE string (`cpe:2.3:a:google:chrome`). Not the version — installed versions are compared against the results locally. |
+| Exploited-CVE feed | `cisa.gov` | Nothing. A public JSON catalogue is downloaded and cached. |
+| Public IP | `api.ipify.org`, `ipv4.icanhazip.com` | Nothing beyond the request, which by its nature shows your IP address to that host. This is the only way to learn your public IP. |
+| Update check | `api.github.com` | Nothing beyond the request. |
+
+Everything else — cleaning, malware scanning, port inspection, and Wi-Fi
+analysis — works fully offline.
 
 ## Features
 
