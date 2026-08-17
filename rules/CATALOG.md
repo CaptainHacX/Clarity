@@ -8,10 +8,10 @@
 
 | Metric | Count |
 |--------|-------|
-| Unique app rules | 100 |
-| 🪟 Windows rules | 88 |
-| 🍎 macOS rules | 75 |
-| 🐧 Linux rules | 73 |
+| Unique app rules | 103 |
+| 🪟 Windows rules | 91 |
+| 🍎 macOS rules | 77 |
+| 🐧 Linux rules | 75 |
 
 ## Applications
 
@@ -21,6 +21,7 @@
 | Adobe Creative Cloud | ✅ | ✅ | ❌ |
 | Android Studio | ✅ | ✅ | ✅ |
 | Audacious | ❌ | ❌ | ✅ |
+| AWS CLI Cache | ✅ | ✅ | ✅ |
 | Bitwarden | ✅ | ✅ | ✅ |
 | Blender | ✅ | ✅ | ✅ |
 | Bun Cache | ✅ | ✅ | ✅ |
@@ -41,6 +42,7 @@
 | GIMP | ✅ | ✅ | ✅ |
 | GitHub Desktop | ✅ | ✅ | ❌ |
 | Go Module Cache | ✅ | ✅ | ✅ |
+| Google Cloud CLI Cache | ✅ | ✅ | ✅ |
 | Google Earth | ✅ | ✅ | ❌ |
 | Gradle Cache | ✅ | ✅ | ✅ |
 | HandBrake | ✅ | ✅ | ✅ |
@@ -71,6 +73,7 @@
 | qBittorrent | ✅ | ✅ | ✅ |
 | Rhythmbox | ❌ | ❌ | ✅ |
 | Ruby Gem Cache | ✅ | ✅ | ✅ |
+| Scoop Cache | ✅ | ❌ | ❌ |
 | Signal Desktop | ✅ | ✅ | ✅ |
 | Slack | ✅ | ✅ | ✅ |
 | Spotify | ✅ | ✅ | ✅ |

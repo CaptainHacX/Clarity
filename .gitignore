@@ -4,6 +4,10 @@ dist/
 dist-prod/
 dist-staging/
 test-results/
+# node-gyp output for the CoreWLAN addon. ABI- and arch-specific, and rebuilt by
+# `npm install` from binding.gyp + corewlan.mm, so committing it would ship a
+# binary that is wrong for anyone else's Electron version.
+src/native/*/build/
 *.log
 .DS_Store
 Thumbs.db

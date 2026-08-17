@@ -4,18 +4,18 @@
   "description": "A modern, open-source system cleaner for Windows, macOS, and Linux",
   "desktopName": "Clarity",
   "main": "./out/main/index.js",
-  "author": {
-    "name": "Clarity Contributors",
-    "email": "clarity@users.noreply.github.com"
-  },
+  "author": "Clarity Contributors <clarity@users.noreply.github.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/CaptainHacX/Clarity.git"
+    "url": "git+https://github.com/CaptainHacX/Clarity.git"
   },
   "homepage": "https://clarity.app",
   "bugs": {
     "url": "https://github.com/CaptainHacX/Clarity/issues"
+  },
+  "optionalDependencies": {
+    "clarity-corewlan": "file:src/native/corewlan"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
@@ -58,6 +58,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate:rules": "tsx src/main/rules/validate.ts",
+    "new-rule": "node scripts/new-rule.js",
+    "find-cache": "node scripts/find-cache.js",
+    "preview-rule": "node scripts/preview-rule.js",
+    "parity-check": "node scripts/parity-check.js",
+    "catalog": "node scripts/generate-catalog.js",
+    "icons": "node scripts/generate-icons.js",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "package": "electron-builder --config electron-builder.yml",
     "release": "node scripts/release.js"
