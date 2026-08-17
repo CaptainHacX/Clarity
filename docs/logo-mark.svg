@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Clarity mark</title>
+  <defs>
+    <linearGradient id="ring" x1="0.18" y1="0" x2="0.82" y2="1">
+      <stop offset="0" stop-color="#fde08a"/>
+      <stop offset="0.42" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <path d="M793.8 329.0 A336 336 0 1 0 793.8 695.0 L668.0 613.3 A186 186 0 1 1 668.0 410.7 Z" fill="url(#ring)"/>
+  <path d="M512 417 Q524 500 607 512 Q524 524 512 607 Q500 524 417 512 Q500 500 512 417 Z" fill="#f59e0b"/>
+</svg>

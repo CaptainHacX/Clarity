@@ -1,14 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- Monochrome tray glyph: gem silhouette + sparkle, transparent background -->
+  <title>Clarity tray glyph</title>
+  <!-- Black on transparency: macOS uses the alpha channel and inverts for the
+       menu bar theme; Windows/Linux recolour it via recolorBitmap(). -->
   <g fill="#000000">
-    <!-- gem -->
-    <polygon points="16,6 10.5,12 16,16 21.5,12"/>
-    <polygon points="10.5,12 8,16.5 16,20 16,16"/>
-    <polygon points="21.5,12 24,16.5 16,20 16,16"/>
-    <polygon points="8,16.5 12.5,26 16,20"/>
-    <polygon points="24,16.5 19.5,26 16,20"/>
-    <polygon points="16,20 12.5,26 19.5,26"/>
-    <!-- sparkle -->
-    <path d="M16 11.5 C 16.6 13.4, 16.8 13.8, 18 14.5 C 16.8 15.2, 16.6 15.6, 16 17.5 C 15.4 15.6, 15.2 15.2, 14 14.5 C 15.2 13.8, 15.4 13.4, 16 11.5 Z"/>
+    <path d="M27.742 8.376 A14 14 0 1 0 27.742 23.624 L23.716 21.010 A9.2 9.2 0 1 1 23.716 10.990 Z"/>
+    <path d="M16 11.2 L20.8 16 L16 20.8 L11.2 16 Z"/>
   </g>
 </svg>

@@ -1,77 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Clarity app icon</title>
+  <g transform="translate(32,32) scale(0.9375)">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1b1b24"/>
-      <stop offset="0.5" stop-color="#12121a"/>
-      <stop offset="1" stop-color="#0a0a10"/>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a1a22"/>
+      <stop offset="1" stop-color="#0a0a0f"/>
     </linearGradient>
-    <radialGradient id="halo" cx="0.5" cy="0.45" r="0.5">
+    <radialGradient id="halo" cx="0.5" cy="0.42" r="0.62">
       <stop offset="0" stop-color="#fbbf24" stop-opacity="0.20"/>
-      <stop offset="0.55" stop-color="#f59e0b" stop-opacity="0.09"/>
       <stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="gem" cx="0.5" cy="0.24" r="0.95">
-      <stop offset="0" stop-color="#ffe58f"/>
-      <stop offset="0.3" stop-color="#fbbf24"/>
-      <stop offset="0.68" stop-color="#f59e0b"/>
-      <stop offset="1" stop-color="#a85008"/>
-    </radialGradient>
-    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
-      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.08"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="sparkGlow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
-      <stop offset="0.3" stop-color="#fff3d6" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#fff3d6" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
+    <linearGradient id="ring" x1="0.18" y1="0" x2="0.82" y2="1">
+      <stop offset="0" stop-color="#fde08a"/>
+      <stop offset="0.42" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#d97706"/>
     </linearGradient>
   </defs>
-
-  <!-- Full-bleed tile -->
-  <rect x="0" y="0" width="1024" height="1024" fill="url(#bg)"/>
-
-  <!-- Ambient glow -->
-  <circle cx="512" cy="512" r="430" fill="url(#halo)"/>
-
-  <!-- Gem : brilliant-cut facets -->
-  <g stroke="#ffffff" stroke-linejoin="round" stroke-linecap="round">
-    <polygon points="512,212 372,336 652,336" fill="url(#gem)" stroke-opacity="0.6" stroke-width="7"/>
-    <polygon points="512,212 372,336 300,452" fill="url(#gem)" stroke-opacity="0.3" stroke-width="5"/>
-    <polygon points="512,212 652,336 724,452" fill="url(#gem)" stroke-opacity="0.3" stroke-width="5"/>
-    <polygon points="372,336 300,452 512,560" fill="url(#gem)" stroke-opacity="0.24" stroke-width="5"/>
-    <polygon points="652,336 724,452 512,560" fill="url(#gem)" stroke-opacity="0.24" stroke-width="5"/>
-    <polygon points="300,452 512,560 452,744" fill="url(#gem)" stroke-opacity="0.3" stroke-width="5"/>
-    <polygon points="724,452 512,560 572,744" fill="url(#gem)" stroke-opacity="0.3" stroke-width="5"/>
-    <polygon points="512,560 452,744 572,744" fill="url(#gem)" stroke-opacity="0.42" stroke-width="6"/>
-  </g>
-
-  <!-- Diagonal light streak across the table -->
-  <polygon points="512,212 372,336 652,336" fill="url(#sheen)"/>
-  <polygon points="512,212 420,286 470,330 512,238" fill="#ffffff" opacity="0.35"/>
-
-  <!-- Girdle highlight -->
-  <line x1="300" y1="452" x2="724" y2="452" stroke="#ffffff" stroke-opacity="0.55" stroke-width="6"/>
-
-  <!-- Floor glow beneath the gem -->
-  <ellipse cx="512" cy="776" rx="170" ry="26" fill="url(#floor)"/>
-
-  <!-- Central sparkle : the clarity light -->
-  <circle cx="512" cy="452" r="150" fill="url(#sparkGlow)"/>
-  <path d="M512 312 C 522 384, 528 400, 556 452 C 528 504, 522 520, 512 592 C 502 520, 496 504, 468 452 C 496 400, 502 384, 512 312 Z"
-        fill="#ffffff"/>
-  <path d="M512 360 C 516 400, 519 410, 534 452 C 519 494, 516 504, 512 544 C 508 504, 505 494, 490 452 C 505 410, 508 400, 512 360 Z"
-        fill="#fffdf5" opacity="0.95"/>
-
-  <!-- Accent sparkles -->
-  <g transform="translate(706,232)">
-    <path d="M0 -26 C 5 -10, 8 -6, 20 0 C 8 6, 5 10, 0 26 C -5 10, -8 6, -20 0 C -8 -6, -5 -10, 0 -26 Z" fill="#ffffff" opacity="0.95"/>
-  </g>
-  <g transform="translate(322,194)">
-    <path d="M0 -14 C 3 -5, 4 -3, 10 0 C 4 3, 3 5, 0 14 C -3 5, -4 3, -10 0 C -4 -3, -3 -5, 0 -14 Z" fill="#ffffff" opacity="0.75"/>
+  <rect width="1024" height="1024" rx="228" fill="url(#tile)"/>
+  <rect x="1.5" y="1.5" width="1021" height="1021" rx="227" fill="none" stroke="#2c2c38" stroke-width="3"/>
+  <circle cx="512" cy="470" r="400" fill="url(#halo)"/>
+  <path d="M793.8 329.0 A336 336 0 1 0 793.8 695.0 L668.0 613.3 A186 186 0 1 1 668.0 410.7 Z" fill="url(#ring)"/>
+  <path d="M512 417 Q524 500 607 512 Q524 524 512 607 Q500 524 417 512 Q500 500 512 417 Z" fill="#fffaf0"/>
   </g>
 </svg>
