@@ -48,32 +48,44 @@ import { ErrorAlert } from '@/components/shared/ErrorAlert'
 import { cn, formatDate, formatDuration, formatNumber } from '@/lib/utils'
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter'
 import { useCveStore } from '@/stores/cve-store'
-import type { CveVulnerability, CveSeverity, CveStatus, CveSummary, CveTrendPoint } from '@shared/types'
+import {
+  AllClear,
+  FixAvailability,
+  RemediationPlan,
+  ScanCoverage,
+} from '@/components/cve/RemediationPanel'
+import type { CveVulnerability, CveSeverity, CveStatus, CveSummary } from '@shared/types'
 import type { LucideIcon } from 'lucide-react'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
-const SEVERITY_COLORS: Record<CveSeverity, { color: string; bg: string; border: string }> = {
-  critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.24)' },
-  high:     { color: '#f97316', bg: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.24)' },
-  medium:   { color: '#eab308', bg: 'rgba(234,179,8,0.10)',  border: 'rgba(234,179,8,0.24)' },
-  low:      { color: '#3b82f6', bg: 'rgba(59,130,246,0.10)', border: 'rgba(59,130,246,0.24)' },
-  none:     { color: '#a1a1aa', bg: 'rgba(161,161,170,0.10)', border: 'rgba(161,161,170,0.24)' },
+// `color` is a theme variable, not a literal: these hues are rendered as text,
+// and the bright versions sit near 2:1 on a light surface. The tinted bg/border
+// stay literal — a 10% wash reads the same in either theme.
+// `color` is for text (AA 4.5:1); `fill` is for charts and legend dots, where the
+// requirement is 3:1 and the hue can stay saturated. Using one value for both is
+// what made the donut read olive-and-brown instead of yellow-and-red.
+const SEVERITY_COLORS: Record<CveSeverity, { color: string; fill: string; bg: string; border: string }> = {
+  critical: { color: 'var(--sev-critical)', fill: 'var(--sev-critical-fill)', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.24)' },
+  high:     { color: 'var(--sev-high)', fill: 'var(--sev-high-fill)', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.24)' },
+  medium:   { color: 'var(--sev-medium)', fill: 'var(--sev-medium-fill)', bg: 'rgba(234,179,8,0.10)',  border: 'rgba(234,179,8,0.24)' },
+  low:      { color: 'var(--sev-low)', fill: 'var(--sev-low-fill)', bg: 'rgba(34,197,94,0.10)', border: 'rgba(34,197,94,0.24)' },
+  none:     { color: 'var(--sev-none)', fill: 'var(--sev-none-fill)', bg: 'rgba(161,161,170,0.10)', border: 'rgba(161,161,170,0.24)' },
 }
 
 const STATUS_COLORS: Record<CveStatus, { color: string; bg: string; border: string }> = {
-  open:           { color: '#ef4444', bg: 'rgba(239,68,68,0.10)',   border: 'rgba(239,68,68,0.24)' },
-  'in-progress':  { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)',  border: 'rgba(245,158,11,0.24)' },
-  'risk-accepted':{ color: '#eab308', bg: 'rgba(234,179,8,0.10)',   border: 'rgba(234,179,8,0.24)' },
-  resolved:       { color: '#22c55e', bg: 'rgba(34,197,94,0.10)',   border: 'rgba(34,197,94,0.24)' },
-  ignored:        { color: '#a1a1aa', bg: 'rgba(161,161,170,0.10)', border: 'rgba(161,161,170,0.24)' },
+  open:           { color: 'var(--sev-critical)', bg: 'rgba(239,68,68,0.10)',   border: 'rgba(239,68,68,0.24)' },
+  'in-progress':  { color: 'var(--sev-amber)', bg: 'rgba(245,158,11,0.10)',  border: 'rgba(245,158,11,0.24)' },
+  'risk-accepted':{ color: 'var(--sev-medium)', bg: 'rgba(234,179,8,0.10)',   border: 'rgba(234,179,8,0.24)' },
+  resolved:       { color: 'var(--sev-green)', bg: 'rgba(34,197,94,0.10)',   border: 'rgba(34,197,94,0.24)' },
+  ignored:        { color: 'var(--sev-none)', bg: 'rgba(161,161,170,0.10)', border: 'rgba(161,161,170,0.24)' },
 }
 
 const RISK_COLORS: Record<string, string> = {
-  high: '#ef4444',
-  medium: '#f59e0b',
-  low: '#22c55e',
-  none: '#a1a1aa',
+  high: 'var(--sev-critical)',
+  medium: 'var(--sev-amber)',
+  low: 'var(--sev-green)',
+  none: 'var(--sev-none)',
 }
 
 const ALL_STATUSES: CveStatus[] = ['open', 'in-progress', 'risk-accepted', 'resolved', 'ignored']
@@ -141,7 +153,7 @@ function ScoreRing({ score }: { score: number }) {
       </svg>
       <div className="absolute flex flex-col items-center" aria-hidden="true">
         <span
-          className="text-[46px] font-bold tracking-tight text-white"
+          className="text-[46px] font-bold tracking-tight text-[var(--text-primary)]"
           style={{ textShadow: `0 0 24px ${colors.glow}30` }}
         >
           {Math.round(animatedScore)}
@@ -156,24 +168,31 @@ function ScoreRing({ score }: { score: number }) {
 
 // ── Section wrapper + heading ────────────────────────────────
 
-function Section({ children, index }: { children: React.ReactNode; index: number }) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: EASE, delay: 0.06 * index }}
-    >
-      {children}
-    </motion.section>
-  )
+/**
+ * Section wrapper.
+ *
+ * Deliberately not animated. Each section used to mount with
+ * `delay: 0.06 * index`, so the page arrived as a cascade — and because every
+ * filter change flips the store to `loading`, that cascade re-ran on each
+ * keystroke and each severity toggle. With a dozen sections the last one waited
+ * most of a second, which is what made filtering feel stuck and scrolling feel
+ * heavy while transforms were still settling.
+ *
+ * `index` is retained so callers don't all have to change, and so the ordering
+ * intent stays visible in the markup.
+ */
+function Section({ children }: { children: React.ReactNode; index?: number }) {
+  return <section>{children}</section>
 }
 
 function SectionHeading({ icon: Icon, title, hint }: { icon: LucideIcon; title: string; hint?: string }) {
   return (
     <div className="mb-3">
       <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-3.5 w-3.5" style={{ color: 'var(--text-faint)' }} strokeWidth={1.8} />}
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-faint)' }}>
+        {Icon && <Icon className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} strokeWidth={1.8} />}
+        {/* --text-muted, not --text-faint: 11px uppercase at 0.18em tracking is
+            already hard to read, and faint put it below any usable contrast. */}
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
           {title}
         </h2>
         <div className="h-px flex-1" style={{ background: 'var(--border-subtle)' }} />
@@ -206,7 +225,7 @@ function StatCard({ icon: Icon, label, value, color, bg, hint }: {
         </div>
         <span className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
       </div>
-      <p className="mt-3 text-[26px] font-bold tracking-tight text-white">
+      <p className="mt-3 text-[26px] font-bold tracking-tight text-[var(--text-primary)]">
         {formatNumber(Math.round(animated))}
       </p>
       {hint && (
@@ -228,7 +247,7 @@ function FilterSelect({ value, options, onChange }: {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none rounded-lg py-2 pl-3 pr-8 text-[12.5px] font-medium text-white outline-none"
+        className="appearance-none rounded-lg py-2 pl-3 pr-8 text-[12.5px] font-medium text-[var(--text-primary)] outline-none"
         style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)' }}
       >
         {options.map((opt) => (
@@ -269,7 +288,7 @@ function SeverityDonut({ data }: { data: { key: CveSeverity; count: number }[] }
                 stroke="none"
               >
                 {visible.map((d) => (
-                  <Cell key={d.key} fill={SEVERITY_COLORS[d.key].color} />
+                  <Cell key={d.key} fill={SEVERITY_COLORS[d.key].fill} />
                 ))}
               </Pie>
             </PieChart>
@@ -283,7 +302,7 @@ function SeverityDonut({ data }: { data: { key: CveSeverity; count: number }[] }
           </div>
         )}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
-          <span className="text-[28px] font-bold tracking-tight text-white">{formatNumber(total)}</span>
+          <span className="text-[28px] font-bold tracking-tight text-[var(--text-primary)]">{formatNumber(total)}</span>
           <span className="text-[10.5px] font-medium uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
             {t('summary.total')}
           </span>
@@ -295,11 +314,11 @@ function SeverityDonut({ data }: { data: { key: CveSeverity; count: number }[] }
             <div key={d.key} className="flex items-center gap-2 text-[12px]">
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ background: SEVERITY_COLORS[d.key].color }}
+                style={{ background: SEVERITY_COLORS[d.key].fill }}
                 aria-hidden="true"
               />
               <span style={{ color: 'var(--text-secondary)' }}>{t(`severity.${d.key}`)}</span>
-              <span className="ml-auto font-mono text-zinc-300">{formatNumber(d.count)}</span>
+              <span className="ml-auto font-mono text-[var(--text-primary)]">{formatNumber(d.count)}</span>
             </div>
           ))
         ) : (
@@ -313,120 +332,6 @@ function SeverityDonut({ data }: { data: { key: CveSeverity; count: number }[] }
 }
 
 // ── Trend chart ───────────────────────────────────────────────
-
-function TrendChart({ data, range, onRangeChange }: {
-  data: CveTrendPoint[]
-  range: number
-  onRangeChange: (range: number) => void
-}) {
-  const { t } = useTranslation('cveScanner')
-  const sliced = data.slice(-range)
-  const maxRemaining = Math.max(1, ...sliced.map((p) => p.remaining))
-
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-1 rounded-lg p-0.5" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-medium)' }}>
-          {[7, 30, 90].map((d) => (
-            <button
-              key={d}
-              onClick={() => onRangeChange(d)}
-              className={cn(
-                'rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-colors',
-                range === d ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-              )}
-              style={range === d ? { background: 'var(--bg-active)' } : undefined}
-            >
-              {t(`chart.days${d}`)}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true" />
-            {t('chart.new')}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-500" aria-hidden="true" />
-            {t('chart.resolved')}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden="true" />
-            {t('chart.remaining')}
-          </span>
-        </div>
-      </div>
-      {sliced.length === 0 ? (
-        <div className="flex h-[220px] items-center justify-center rounded-xl" style={{ background: 'var(--bg-subtle)' }}>
-          <p className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>{t('chart.noData')}</p>
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={220}>
-          <ComposedChart data={sliced} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-            <defs>
-              <linearGradient id="cve-trend-new" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="cve-trend-resolved" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 10, fill: 'var(--text-dim)' }}
-              tickLine={false}
-              axisLine={{ stroke: 'var(--border-subtle)' }}
-              minTickGap={28}
-            />
-            <YAxis hide domain={[0, maxRemaining]} />
-            <Tooltip
-              cursor={{ stroke: 'var(--border-strong)' }}
-              contentStyle={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '10px',
-                fontSize: '12px',
-                color: 'var(--text-primary)'
-              }}
-              labelStyle={{ color: 'var(--text-muted)', marginBottom: 4 }}
-              formatter={(value, name) => [formatNumber(Number(value)), name]}
-            />
-            <Area
-              type="monotone"
-              dataKey="new"
-              stroke="#ef4444"
-              fill="url(#cve-trend-new)"
-              strokeWidth={1.5}
-              dot={false}
-              name={t('chart.new')}
-            />
-            <Area
-              type="monotone"
-              dataKey="resolved"
-              stroke="#22c55e"
-              fill="url(#cve-trend-resolved)"
-              strokeWidth={1.5}
-              dot={false}
-              name={t('chart.resolved')}
-            />
-            <Line
-              type="monotone"
-              dataKey="remaining"
-              stroke="#f59e0b"
-              strokeWidth={2}
-              dot={false}
-              name={t('chart.remaining')}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      )}
-    </div>
-  )
-}
-
-// ── Skeleton loader ───────────────────────────────────────────
 
 function SkeletonBlock({ className }: { className?: string }) {
   return (
@@ -514,7 +419,9 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
         exit={{ x: '100%' }}
         transition={{ duration: 0.35, ease: EASE }}
         style={{
-          background: 'var(--card-bg)',
+          // Opaque: a dialog must not show the page through itself. --card-bg is
+          // 62% transparent in light theme, which is what washed this panel out.
+          background: 'var(--panel-bg)',
           borderLeft: '1px solid var(--border-medium)',
           boxShadow: '-24px 0 64px var(--panel-shadow)'
         }}
@@ -530,9 +437,9 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: sev.color }} />
                 {t(`severity.${vuln.severity}`)}
               </span>
-              <span className="font-mono text-[12.5px] font-semibold text-zinc-200">{vuln.cveId}</span>
+              <span className="font-mono text-[12.5px] font-semibold text-[var(--text-primary)]">{vuln.cveId}</span>
             </div>
-            <h2 className="mt-2 text-[18px] font-bold tracking-tight text-white">{vuln.appName}</h2>
+            <h2 className="mt-2 text-[18px] font-bold tracking-tight text-[var(--text-primary)]">{vuln.appName}</h2>
             <p className="mt-0.5 font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>
               {t('slideover.component')}: {vuln.appName}
             </p>
@@ -599,7 +506,7 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
                   onClick={() => handleStatus(st)}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11.5px] font-semibold transition-all',
-                    active ? 'text-white' : 'text-zinc-400'
+                    !active && 'text-[var(--text-muted)]'
                   )}
                   style={{
                     background: active ? c.bg : 'var(--bg-subtle)',
@@ -621,7 +528,7 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
               href={`https://nvd.nist.gov/vuln/detail/${vuln.cveId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-zinc-300 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--text-primary)] transition-colors"
               style={{ border: '1px solid var(--border-strong)' }}
             >
               <ExternalLink className="h-3 w-3" />
@@ -629,7 +536,7 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
             </a>
             <button
               onClick={() => navigate('/updates')}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-zinc-300 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--text-primary)] transition-colors"
               style={{ border: '1px solid var(--border-strong)' }}
             >
               <RefreshCw className="h-3 w-3" />
@@ -692,7 +599,9 @@ export function CveScannerPage() {
   const componentFilter = useCveStore((s) => s.componentFilter)
   const components = useCveStore((s) => s.components)
   const summary = useCveStore((s) => s.summary)
-  const trend = useCveStore((s) => s.trend)
+  const remediations = useCveStore((s) => s.remediations)
+  const fixAvailability = useCveStore((s) => s.fixAvailability)
+  const scanCoverage = useCveStore((s) => s.coverage)
   const librarySize = useCveStore((s) => s.librarySize)
   const selectedId = useCveStore((s) => s.selectedId)
   const statuses = useCveStore((s) => s.statuses)
@@ -707,7 +616,6 @@ export function CveScannerPage() {
   const [searchInput, setSearchInput] = useState(searchQuery)
   const [statusFilter, setStatusFilter] = useState<'all' | CveStatus>('all')
   const [dateFilter, setDateFilter] = useState('all')
-  const [range, setRange] = useState(30)
   const [scanDuration, setScanDuration] = useState<number | null>(null)
   const scanStartRef = useRef<number | null>(null)
   const tableRef = useRef<HTMLDivElement | null>(null)
@@ -966,7 +874,7 @@ export function CveScannerPage() {
         <PageHeader title={t('pageTitle')} description={t('pageDescription')} action={headerAction} />
         <div className="flex flex-1 flex-col items-center justify-center pb-16">
           <ScoreRing score={100} />
-          <h3 className="mt-6 text-[16px] font-semibold text-zinc-200">{t('empty.title')}</h3>
+          <h3 className="mt-6 text-[16px] font-semibold text-[var(--text-primary)]">{t('empty.title')}</h3>
           <p className="mt-1.5 max-w-sm text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
             {t('empty.description')}
           </p>
@@ -1066,16 +974,23 @@ export function CveScannerPage() {
           </div>
         </Section>
 
-        {/* ── 2 · Severity + trend charts ───────────────── */}
+        {/* ── 2 · Severity + what to actually do ────────── */}
+        {/* The trend chart was removed: the NVD query uses a rolling 90-day
+            lastModified window, so its points moved with scan timing rather than
+            with real risk. Its space now carries the remediation plan. */}
         <Section index={1}>
           <SectionHeading icon={Layers} title={t('chart.severityHeading')} hint={t('chart.severityHint')} />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
             <div className="glass-card rounded-2xl p-5 lg:col-span-2">
               {summary && <SeverityDonut data={severityData} />}
             </div>
-            <div className="glass-card rounded-2xl p-5 lg:col-span-3">
-              <TrendChart data={trend} range={range} onRangeChange={setRange} />
+            <div className="lg:col-span-3">
+              <RemediationPlan remediations={remediations} />
             </div>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <FixAvailability fix={fixAvailability} />
+            <ScanCoverage coverage={scanCoverage} />
           </div>
         </Section>
 
@@ -1097,7 +1012,7 @@ export function CveScannerPage() {
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   onBlur={handleSearch}
-                  className="w-full bg-transparent text-[13px] text-white placeholder-zinc-600 outline-none"
+                  className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder-zinc-600 outline-none"
                 />
               </div>
               <FilterSelect
@@ -1144,7 +1059,7 @@ export function CveScannerPage() {
               <div className="border-b px-4 py-3" style={{ borderColor: 'var(--border-subtle)' }}>
                 <div className="mb-2 flex items-center gap-2.5">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-400" strokeWidth={2} />
-                  <span className="text-[12.5px] font-medium text-zinc-200">{t('scan.inProgress')}</span>
+                  <span className="text-[12.5px] font-medium text-[var(--text-primary)]">{t('scan.inProgress')}</span>
                 </div>
                 <div
                   className="h-1.5 overflow-hidden rounded-full"
@@ -1215,7 +1130,7 @@ export function CveScannerPage() {
                             {t(`severity.${v.severity}`)}
                           </span>
                           {/* Vulnerability */}
-                          <span className="truncate text-[12.5px] font-medium text-zinc-200" title={v.description ?? v.cveId}>
+                          <span className="truncate text-[12.5px] font-medium text-[var(--text-primary)]" title={v.description ?? v.cveId}>
                             {v.description ?? v.cveId}
                           </span>
                           {/* CVE ID */}
@@ -1281,8 +1196,8 @@ export function CveScannerPage() {
                 {/* Footer: count + pagination */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
-                    {t('table.showing')} <span className="font-semibold text-zinc-300">{formatNumber(rows.length)}</span> {t('table.of')}{' '}
-                    <span className="font-semibold text-zinc-300">{formatNumber(total)}</span>
+                    {t('table.showing')} <span className="font-semibold text-[var(--text-primary)]">{formatNumber(rows.length)}</span> {t('table.of')}{' '}
+                    <span className="font-semibold text-[var(--text-primary)]">{formatNumber(total)}</span>
                   </span>
                   <div className="flex items-center gap-3">
                     <button
@@ -1323,6 +1238,14 @@ export function CveScannerPage() {
 
         {/* ── 4 · Recommendations + quick actions ───────── */}
         <Section index={3}>
+          {/* When nothing critical or high is outstanding, say so *and* qualify it
+              with what was actually checked. An unqualified all-clear is the one
+              inaccuracy that matters most on a security page. */}
+          {(summary?.critical ?? 0) + (summary?.high ?? 0) === 0 && (
+            <div className="mb-4">
+              <AllClear coverage={scanCoverage} noFixUpstream={fixAvailability.noFixUpstream} />
+            </div>
+          )}
           <SectionHeading icon={Sparkles} title={t('recs.allClear')} hint={t('recs.allClearDesc')} />
           <div className="mb-4 space-y-2.5">
             {recommendations.map((rec) => (
@@ -1353,7 +1276,7 @@ export function CveScannerPage() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-zinc-200">{rec.title}</p>
+                  <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{rec.title}</p>
                   <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{rec.description}</p>
                 </div>
                 {rec.action && (
@@ -1530,7 +1453,7 @@ function QuickActionCard({ icon: Icon, title, description, gradient, glow, disab
         <Icon className="h-5 w-5 text-white" strokeWidth={2.2} />
       </div>
       <div>
-        <p className="text-[14px] font-semibold text-zinc-200">{title}</p>
+        <p className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</p>
         <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>{description}</p>
       </div>
       <ArrowRight
@@ -1549,7 +1472,7 @@ function ScanInfo({ icon: Icon, label, value }: { icon: LucideIcon; label: strin
         <Icon className="h-3.5 w-3.5" style={{ color: 'var(--text-faint)' }} strokeWidth={1.8} />
         <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
       </div>
-      <p className="mt-1.5 truncate text-[15px] font-bold tracking-tight text-white">{value}</p>
+      <p className="mt-1.5 truncate text-[15px] font-bold tracking-tight text-[var(--text-primary)]">{value}</p>
     </div>
   )
 }

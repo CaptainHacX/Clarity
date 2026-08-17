@@ -642,9 +642,30 @@ export interface NetworkSecurityStatus {
     detected: boolean
     interfaces: string[]
   }
-  /** Primary (non-virtual, external) IPv4 address. */
+  /**
+   * This machine's primary IPv4 address, from the first non-loopback,
+   * non-virtual interface.
+   *
+   * Local, not public: on any normal LAN this is an RFC1918 address such as
+   * 192.168.1.105. Reporting the internet-facing address would mean asking an
+   * outside service what it sees, and Clarity makes no such call. The UI labels
+   * it "IPv4" for that reason — an earlier "Public IPv4" label read this
+   * field's old "external" wording as internet-facing, which it never was.
+   */
   ipv4: string | null
-  /** Primary (non-virtual, external) IPv6 address. */
+  /**
+   * The internet-facing address, as seen from outside.
+   *
+   * Requires an outbound lookup — a machine cannot determine this locally — so
+   * it is `offline` whenever there is no usable internet path, and cached
+   * between scans. See `services/public-ip.ts`.
+   */
+  publicIp: {
+    address: string | null
+    state: 'ok' | 'offline' | 'unknown'
+    checkedAt: number | null
+  }
+  /** This machine's primary IPv6 address, same selection rule as `ipv4`. */
   ipv6: string | null
   /** macOS Location Services permission for this process. Drives SSID/BSSID redaction. */
   locationAccess: LocationAccessStatus
@@ -1516,10 +1537,73 @@ export interface CveVulnerability {
   installedVersion: string
   severity: CveSeverity
   cvssScore: number | null
+  /**
+   * Lowest published fix strictly newer than `installedVersion`, or null when no
+   * fix has been published.
+   *
+   * Null means "still open upstream", not "unknown": a finding whose every known
+   * fix is already at or below the installed version is dropped during the scan
+   * rather than surfaced with a null here.
+   */
   fixedIn: string | null
   description: string | null
   firstDetectedAt: string
   lastScannedAt: string
+  /** On CISA's Known Exploited Vulnerabilities list — prioritise over raw CVSS. */
+  kev?: boolean
+  /** ISO date CISA added it to KEV, when known. */
+  kevAddedAt?: string | null
+}
+
+/**
+ * One app's upgrade path: the single version that clears the most findings.
+ *
+ * `targetVersion` is the *highest* fix among this app's findings, because
+ * installing it also clears every lower fix. `openCount` is what will still
+ * remain afterwards, so the card can't promise a clean slate it won't deliver.
+ */
+export interface CveRemediation {
+  appName: string
+  installedVersion: string
+  targetVersion: string | null
+  /** Findings cleared by moving to `targetVersion`. */
+  fixableCount: number
+  /** Findings with no published fix; these survive the update. */
+  openCount: number
+  /** Severity breakdown of the fixable findings. */
+  fixableBySeverity: Record<CveSeverity, number>
+  /** Highest CVSS among the fixable findings, for ordering. */
+  maxCvss: number | null
+  /** How many of the fixable findings are on CISA KEV. */
+  kevCount: number
+}
+
+/** Split of findings by whether anything can actually be done about them. */
+export interface CveFixAvailability {
+  /** A newer fixed version exists. */
+  fixAvailable: number
+  /** No upstream fix published — monitor/mitigate only. */
+  noFixUpstream: number
+}
+
+/**
+ * What the scan actually looked at.
+ *
+ * Without this a clean result is ambiguous: "0 findings" could mean the machine
+ * is healthy or that nothing was ever checked. Only apps matched to an NVD CPE
+ * can be queried, so the unmatched count is reported rather than hidden.
+ */
+export interface CveCoverage {
+  /** Installed applications discovered on the machine. */
+  installedTotal: number
+  /** Apps matched to a CPE and therefore actually queried. */
+  scannedCount: number
+  /** Apps with no CPE mapping, so never checked. */
+  skippedCount: number
+  /** Bounded sample of skipped app names, for the UI to list. */
+  skippedSample: string[]
+  /** Recency window of the NVD query, in days. */
+  windowDays: number
 }
 
 /** Unfiltered severity counts (always the full picture, ignoring any active severity filter) */
@@ -1554,6 +1638,12 @@ export interface CvePageResult {
   components: string[]
   /** Daily new/resolved/remaining buckets (90 days, oldest → newest) */
   trend: CveTrendPoint[]
+  /** Per-app upgrade targets, highest impact first. Always the full set. */
+  remediations: CveRemediation[]
+  /** Actionable vs open-upstream split across the full dataset. */
+  fixAvailability: CveFixAvailability
+  /** What the scan examined, and what it could not. */
+  coverage: CveCoverage
 }
 
 // ─── Large File Finder ────────────────────────────────────

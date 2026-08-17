@@ -130,9 +130,16 @@
   },
   "coverage": {
     "heading": "Coverage",
-    "hint": "CVE entries tracked for your installed components",
+    "hint": "These applications have no NVD CPE mapping, so they were never checked. They are unknown, not confirmed clean.",
     "entries": "{{total}} of {{library}} entries",
-    "pct": "{{pct}}%"
+    "pct": "{{pct}}%",
+    "title": "Scan coverage",
+    "scanned": "apps scanned",
+    "notMatched": "not matched",
+    "showList": "Show which apps",
+    "hideList": "Hide list",
+    "andMore": "+{{count}} more",
+    "window": "NVD lookback window: {{days}} days"
   },
   "slideover": {
     "close": "Close details",
@@ -175,5 +182,30 @@
   },
   "skeleton": {
     "loading": "Loading your security overview..."
+  },
+  "remediation": {
+    "title": "Remediation plan",
+    "clears": "clears {{count}} finding",
+    "clears_plural": "clears {{count}} findings",
+    "remainsOpen": "{{count}} remains open",
+    "remainsOpen_plural": "{{count}} remain open",
+    "noFixYet": "No upstream fix published yet",
+    "exploited": "{{count}} exploited",
+    "showAll": "Show {{count}} more",
+    "showFewer": "Show fewer"
+  },
+  "fixStatus": {
+    "title": "Fix status",
+    "available": "Fix available",
+    "noFix": "No fix upstream",
+    "noFixHint": "These have no published patch yet. Monitor them; mitigation may be the only option for now."
+  },
+  "allClear": {
+    "title": "No critical or high severity findings",
+    "body": "Clarity checked {{scanned}} of {{total}} installed applications against the NVD and found nothing critical or high.",
+    "bodyNoCoverage": "Nothing critical or high was found in the applications Clarity was able to check.",
+    "unscanned": "{{count}} app not checked",
+    "unscanned_plural": "{{count}} apps not checked",
+    "openUpstream": "{{count}} open upstream"
   }
 }

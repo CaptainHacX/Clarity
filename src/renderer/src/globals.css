@@ -86,6 +86,34 @@
   --bg-active: rgba(255,255,255,0.08);
   --bg-elevated: #1e1e28;
   --bg-overlay: #2a2a36;
+  /* Opaque, for modal/slide-over surfaces. See the light-theme note. */
+  --panel-bg: #16161a;
+  /*
+   * Severity/status text hues. Split per theme because these are used as *text*,
+   * and the bright variants sit at roughly 2:1 on white — the app already darkens
+   * amber this way for .light .text-amber-400, but inline styles bypassed that.
+   */
+  --sev-critical: #ef4444;
+  --sev-high: #f97316;
+  --sev-medium: #eab308;
+  --sev-low: #3b82f6;
+  --sev-none: #a1a1aa;
+  --sev-green: #22c55e;
+  --sev-amber: #f59e0b;
+  /*
+   * Chart/legend fills, separate from the text hues above.
+   * Text needs WCAG AA 4.5:1, which forces yellow toward brown and green toward
+   * olive — correct for a label, muddy for a donut segment. Graphics only need
+   * 3:1, so these stay saturated and read as a proper dark-red → red → yellow →
+   * green severity ramp. On this near-black surface the ramp is lifted so the
+   * deepest step is still visible; critical stays the deeper red so the ordering
+   * cue survives.
+   */
+  --sev-critical-fill: #a81d1d;
+  --sev-high-fill: #f87171;
+  --sev-medium-fill: #eab308;
+  --sev-low-fill: #22c55e;
+  --sev-none-fill: #71717a;
   --flyout-bg: rgba(18, 18, 26, 0.92);
   --toast-bg: rgba(20, 20, 28, 0.85);
 
@@ -94,7 +122,7 @@
   --text-secondary: #a1a1aa;
   --text-muted: #8a8a96;
   --text-dim: #54545c;
-  --text-faint: #3e3e48;
+  --text-faint: #85858f;
   --text-ghost: rgba(255,255,255,0.3);
   --text-ghost-2: rgba(255,255,255,0.5);
   --text-on-accent: #09090b;
@@ -177,6 +205,28 @@
   --bg-active: rgba(0,0,0,0.08);
   --bg-elevated: rgba(255, 255, 255, 0.58);
   --bg-overlay: rgba(255, 255, 255, 0.64);
+  /*
+   * Opaque on purpose. `--card-bg` is 62% white here, which is correct for cards
+   * layered over the page but wrong for a dialog: the CVE slide-over used it and
+   * the table behind showed straight through, washing out every label inside.
+   * Dark theme never showed the problem because its --card-bg is already opaque.
+   */
+  --panel-bg: #ffffff;
+  /* Darkened to clear WCAG AA (4.5:1) as text on the light surface. */
+  --sev-critical: #b91c1c;
+  --sev-high: #c2410c;
+  --sev-medium: #a16207;
+  --sev-low: #1d4ed8;
+  --sev-none: #6b6b75;
+  --sev-green: #15803d;
+  --sev-amber: #b45309;
+  /* Same ramp on a white card: each step clears 3:1 against the surface while
+     staying recognisably dark-red / red / yellow / green. */
+  --sev-critical-fill: #991b1b;
+  --sev-high-fill: #dc2626;
+  --sev-medium-fill: #ca8a04;
+  --sev-low-fill: #16a34a;
+  --sev-none-fill: #a1a1aa;
   --flyout-bg: rgba(255, 255, 255, 0.74);
   --toast-bg: rgba(255, 255, 255, 0.78);
 
@@ -185,7 +235,7 @@
   --text-secondary: #52525b;
   --text-muted: #71717a;
   --text-dim: #a1a1aa;
-  --text-faint: #c4c4cc;
+  --text-faint: #71717c;
   --text-ghost: rgba(0,0,0,0.25);
   --text-ghost-2: rgba(0,0,0,0.45);
   --text-on-accent: #ffffff;
