@@ -1,0 +1,14 @@
+{
+  "name": "clarity-corewlan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "In-process CoreWLAN + CoreLocation bridge for Clarity. macOS only — binding.gyp compiles nothing on Windows/Linux.",
+  "main": "index.js",
+  "license": "MIT",
+  "gypfile": true,
+  "files": [
+    "index.js",
+    "binding.gyp",
+    "corewlan.mm"
+  ]
+}

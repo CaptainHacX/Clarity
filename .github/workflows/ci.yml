@@ -30,8 +30,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # macOS-only native addon. `npm ci` builds it via its gypfile; this proves
+      # the binary is actually present on macOS rather than silently skipped,
+      # since it is an optionalDependency and a build failure would not fail the
+      # install. On Windows/Linux the package deliberately produces no binary.
+      - name: Verify CoreWLAN addon built
+        if: runner.os == 'macOS'
+        run: node -e "const m=require('clarity-corewlan').load(); if(!m) { console.error('CoreWLAN addon missing — BSSIDs would be unavailable on macOS'); process.exit(1) } console.log('CoreWLAN addon OK')"
+
       - name: Validate cleaner rules
         run: npm run validate:rules
+
+      - name: Type-check
+        run: npm run typecheck
 
       - name: Test
         run: npm test

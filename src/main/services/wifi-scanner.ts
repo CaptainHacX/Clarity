@@ -14,7 +14,10 @@ import { bandFromChannel, securityLevelFromShort, wifiNetworkKey } from '../../s
 import { bandFromFrequency, classifySecurity, isRedactedSsid, toSignalPercent } from './network-security'
 import {
   bandLabelFromCode,
+  coreWlanLocationAuthStatus,
+  coreWlanLocationServicesEnabled,
   coreWlanScan,
+  locationAccessFromAuthStatus,
   frequencyFromChannel,
   phyModesFromCodes,
   securityFromCodes,
@@ -828,9 +831,26 @@ export async function scanWifiNetworks(detailed = false): Promise<WifiScanSnapsh
   return scanViaSystemInformation(detailed, now)
 }
 
-/** macOS Location Services state as far as the Wi-Fi scanner can tell. */
+/**
+ * macOS Location Services state.
+ *
+ * Asks CoreLocation directly when the native addon is present — that is the
+ * authoritative answer for *this* process, which is the only one that matters.
+ * Without the addon the status has to be inferred from whether any BSSID came
+ * back, which is why it used to read `not-determined` even for a user who had
+ * granted access: the osascript child it inferred from could never see the
+ * grant. See the corewlan module header.
+ */
 export async function probeLocationAccess(): Promise<LocationAccessStatus> {
   if (process.platform !== 'darwin') return 'unknown'
+
+  const status = coreWlanLocationAuthStatus()
+  if (status != null) {
+    // A per-app grant is meaningless while the system-wide switch is off.
+    if (coreWlanLocationServicesEnabled() === false) return 'denied'
+    return locationAccessFromAuthStatus(status)
+  }
+
   const scan = await coreWlanScan(false)
   if (!scan.ok) return 'unknown'
   const anyBssid = scan.networks.some((n) => n.bssid) || scan.current?.bssid != null

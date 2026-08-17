@@ -13,6 +13,13 @@ directories:
 files:
   - out/**/*
 
+# The CoreWLAN addon must load from the filesystem, not from inside the asar —
+# dlopen cannot read an archived .node. macOS-only by nature: on Windows and
+# Linux the package contains no binary (binding.gyp compiles nothing there) and
+# the loader returns null, which is the signal to use netsh / nmcli instead.
+asarUnpack:
+  - "**/node_modules/clarity-corewlan/**"
+
 extraResources:
   - from: resources/icon.ico
     to: icon.ico

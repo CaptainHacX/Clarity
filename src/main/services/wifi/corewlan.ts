@@ -9,13 +9,33 @@
  * the channel/band/width, PHY modes, security suites, beacon interval and the
  * noise floor the tool needs.
  *
- * Electron has no CoreWLAN binding, so the framework is driven through JXA
- * (`osascript -l JavaScript`) — no native module, no compile step, and the
- * child process inherits the app's TCC "responsible process", so the Location
- * grant the user gives Clarity is the one CoreWLAN sees.
+ * The framework is reached two ways, in this order:
+ *
+ * 1. `clarity-corewlan`, an in-process N-API addon. This is the only path that
+ *    can return BSSIDs, because macOS resolves the Location authorization
+ *    against the *requesting process's own bundle identity*. In-process, that
+ *    identity is `com.clarity.app` — the bundle carrying
+ *    NSLocationWhenInUseUsageDescription and the grant the user gave.
+ *
+ * 2. `osascript -l JavaScript` driving the same API through JXA, used when the
+ *    addon is absent (not compiled, ABI mismatch). It still yields SSIDs,
+ *    channel, band, width, security and PHY — everything except the two
+ *    location-gated fields — so the tool degrades rather than dying.
+ *
+ * The JXA path was once assumed to inherit the app's TCC identity. It does not.
+ * Measured on macOS 26: inside that child, `NSBundle.mainBundle.bundleIdentifier`
+ * is `com.apple.osascript` and `CLLocationManager.authorizationStatus` is 0
+ * (notDetermined) while the app itself is authorized — so every BSSID and
+ * country code came back nil no matter what the user granted Clarity. A
+ * bundle-less helper binary fares worse still (no bundle id, no SSIDs either),
+ * which is why the fix is in-process rather than another spawned process.
+ *
+ * Both paths emit the same JSON shape, so `parseCoreWlanOutput` remains the one
+ * place that validates the payload.
  */
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import type { LocationAccessStatus } from '../../../shared/types'
 
 const execFileAsync = promisify(execFile)
 
@@ -294,13 +314,137 @@ export function parseCoreWlanOutput(stdout: string): CoreWlanScan {
   }
 }
 
+// ─── Native addon ───────────────────────────────────────────
+
+interface CoreWlanNative {
+  scanJson(active: boolean): Promise<string>
+  locationAuthStatus(): number
+  locationServicesEnabled(): boolean
+  requestLocationAuthorization(): void
+}
+
+let nativeChecked = false
+let native: CoreWlanNative | null = null
+
+/**
+ * The in-process addon, or null when it isn't usable (non-macOS, not compiled,
+ * ABI mismatch). Resolved once and cached; never throws.
+ */
+export function getCoreWlanNative(): CoreWlanNative | null {
+  if (nativeChecked) return native
+  nativeChecked = true
+  native = null
+  if (process.platform !== 'darwin') return null
+  try {
+    // Optional dependency: absent on Windows/Linux and on a macOS checkout
+    // where the build step could not run.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const loader = require('clarity-corewlan') as { load: () => CoreWlanNative | null }
+    const mod = loader.load()
+    if (mod && typeof mod.scanJson === 'function') native = mod
+  } catch {
+    native = null
+  }
+  return native
+}
+
+/** Test seam — forces the next `getCoreWlanNative()` to resolve again. */
+export function resetCoreWlanNative(): void {
+  nativeChecked = false
+  native = null
+}
+
+/**
+ * Map a raw CLAuthorizationStatus onto our status enum.
+ *
+ * Lives here, beside the function whose output it interprets. It was briefly in
+ * `wifi-scanner`, but `network-security` needs it too and `wifi-scanner` already
+ * imports `network-security` — so that placement made the two modules circular,
+ * survivable only via a deferred `import()`. Both already depend on this module,
+ * so here the dependency graph stays a tree.
+ *
+ * `restricted` reports as denied: it is a parental-controls / MDM state the user
+ * cannot grant from Settings, so offering them the prompt would be a dead end.
+ */
+export function locationAccessFromAuthStatus(status: number): LocationAccessStatus {
+  switch (status) {
+    case 3: // authorizedAlways
+    case 4: // authorizedWhenInUse
+      return 'granted'
+    case 1: // restricted
+    case 2: // denied
+      return 'denied'
+    case 0: // notDetermined
+      return 'not-determined'
+    default:
+      return 'unknown'
+  }
+}
+
+/**
+ * CLAuthorizationStatus for this process, or null when the addon is absent.
+ * 0 notDetermined · 1 restricted · 2 denied · 3 authorizedAlways · 4 whenInUse
+ */
+export function coreWlanLocationAuthStatus(): number | null {
+  const mod = getCoreWlanNative()
+  if (!mod) return null
+  try {
+    return mod.locationAuthStatus()
+  } catch {
+    return null
+  }
+}
+
+/** Whether Location Services is on system-wide. Null when the addon is absent. */
+export function coreWlanLocationServicesEnabled(): boolean | null {
+  const mod = getCoreWlanNative()
+  if (!mod) return null
+  try {
+    return mod.locationServicesEnabled()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Raise the system Location prompt for this bundle. Returns false when there is
+ * no addon to ask through — the caller then falls back to opening Settings.
+ */
+export function coreWlanRequestLocation(): boolean {
+  const mod = getCoreWlanNative()
+  if (!mod) return false
+  try {
+    mod.requestLocationAuthorization()
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Run a CoreWLAN scan. `active` triggers a radio sweep (slow, complete);
  * otherwise the driver's cached neighbour list is read (fast, used for the
  * live signal poll). Never throws — a failure comes back as `ok: false`.
+ *
+ * Prefers the in-process addon; only it can return BSSIDs. See the module
+ * header for why the osascript fallback cannot.
  */
 export async function coreWlanScan(active: boolean): Promise<CoreWlanScan> {
   if (process.platform !== 'darwin') return { ...EMPTY, error: 'not-darwin' }
+
+  const mod = getCoreWlanNative()
+  if (mod) {
+    try {
+      const json = await mod.scanJson(active)
+      const parsed = parseCoreWlanOutput(json)
+      // A native scan that came back empty is still a real answer (radio off,
+      // no neighbours). Only fall through when the bridge itself failed.
+      if (parsed.ok) return parsed
+    } catch {
+      // Fall through to the JXA path below.
+    }
+  }
+
   try {
     const { stdout } = await execFileAsync('/usr/bin/osascript', ['-l', 'JavaScript', '-e', buildScript(active)], {
       timeout: active ? 20_000 : 8_000,

@@ -2,6 +2,7 @@ import { ipcMain, shell } from 'electron'
 import { release } from 'os'
 import { IPC } from '../../shared/channels'
 import { collectLocationAccess, collectNetworkSecurityStatus } from '../services/network-security'
+import { coreWlanRequestLocation } from '../services/wifi/corewlan'
 
 /**
  * macOS Settings > Privacy & Security > Location Services.
@@ -43,10 +44,19 @@ export async function openLocationSettings(): Promise<boolean> {
 export function registerNetworkSecurityIpc(): void {
   ipcMain.handle(IPC.NETWORK_SECURITY_SCAN, () => collectNetworkSecurityStatus())
 
-  // The CoreLocation prompt can only be raised from a renderer (Electron routes
-  // `navigator.geolocation` through CoreLocation on macOS), so the renderer
-  // triggers it and this handler just re-reads the resulting state.
+  // Ask CoreLocation directly through the native addon when it is present —
+  // that raises the prompt for this bundle, which is the identity the BSSID
+  // gate actually checks. The renderer's `navigator.geolocation` trigger stays
+  // as the fallback for a build without the addon; on its own it authorized the
+  // app while the scan still ran in a differently-identified child process, so
+  // the grant appeared to do nothing.
   ipcMain.handle(IPC.NETWORK_SECURITY_REQUEST_LOCATION, async () => {
+    if (coreWlanRequestLocation()) {
+      // The prompt resolves asynchronously on the main run loop; give it a
+      // moment so the status this returns reflects the user's answer rather
+      // than the state from before they were asked.
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+    }
     await collectLocationAccess()
     return collectNetworkSecurityStatus()
   })
