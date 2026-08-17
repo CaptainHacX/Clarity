@@ -20,7 +20,7 @@
     Build:     <a href="https://github.com/CaptainHacX/Clarity/actions"><img src="https://img.shields.io/github/actions/workflow/status/CaptainHacX/Clarity/release.yml?style=flat-square&label=Build" alt="Build" /></a>
   -->
   <img src="https://img.shields.io/badge/Stars-Open%20Source-blue?style=flat-square" alt="Stars" />
-  <img src="https://img.shields.io/badge/Release-v1.0.1-blue?style=flat-square" alt="Release" />
+  <img src="https://img.shields.io/badge/Release-v1.0.3-blue?style=flat-square" alt="Release" />
   <img src="https://img.shields.io/badge/Downloads-Free-blue?style=flat-square" alt="Downloads" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Build-Passing-blue?style=flat-square" alt="Build" />
@@ -63,11 +63,11 @@
 
 Grab the latest installer for your platform from [GitHub Releases](https://github.com/CaptainHacX/Clarity/releases):
 
-| Platform | Format | Direct download (v1.0.1) |
+| Platform | Format | Direct download (v1.0.3) |
 |----------|--------|--------------------------|
-| **Windows** | `.exe` installer | [Clarity-Setup-1.0.1.exe](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-Setup-1.0.1.exe) |
-| **macOS** | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-arm64.dmg) |
-| **Linux** | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.1/Clarity-1.0.1-prod-amd64.deb) |
+| **Windows** | `.exe` installer | [Clarity-Setup-1.0.3.exe](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-Setup-1.0.3.exe) |
+| **macOS** | `.dmg` (Intel & Apple Silicon) | [Intel (x64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-x64.dmg) &middot; [Apple Silicon (arm64)](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-arm64.dmg) |
+| **Linux** | `.AppImage` or `.deb` | [AppImage](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-x86_64.AppImage) &middot; [deb](https://github.com/CaptainHacX/Clarity/releases/download/v1.0.3/Clarity-1.0.3-prod-amd64.deb) |
 
 > **macOS note:** Clarity is **ad-hoc signed** but not notarized with an Apple Developer ID
 > (that requires a paid Apple Developer account, which the project doesn't fund yet).
@@ -177,7 +177,7 @@ See [CLI.md](CLI.md) for the full reference — categories, options, JSON output
 
 Clarity's cleaning targets are defined as **plain JSON files** — no code required to add a cleaner for your favorite app.
 
-- **100 unique app rules** (Windows 88, macOS 75, Linux 73) covering apps, browsers, games, GPUs, and system paths.
+- **103 unique app rules** (Windows 91, macOS 77, Linux 75) covering apps, browsers, games, GPUs, and system paths.
 - Validated against a [JSON Schema](rules/schema/rules.schema.json) with editor autocomplete.
 - Template variables (`${APPDATA}`, `${CACHES}`, `${CONFIG}`, ...) resolve at runtime per-platform.
 
@@ -203,7 +203,7 @@ npm run validate:rules
 | **i18n** | [i18next](https://www.i18next.com/) — 30 locales |
 | **Updater** | [electron-updater](https://www.electron.build/auto-update) |
 | **System info** | [systeminformation](https://systeminformation.io/) |
-| **Testing** | [Vitest](https://vitest.dev/) — 2,600+ tests |
+| **Testing** | [Vitest](https://vitest.dev/) — 2,700+ tests |
 
 ## Project Structure
 
@@ -233,7 +233,7 @@ npm run dev
 # Type-check both processes
 npm run typecheck
 
-# Run the test suite (2,600+ tests)
+# Run the test suite (2,700+ tests)
 npm test
 
 # Production build
@@ -243,7 +243,7 @@ npm run build
 npm run package
 ```
 
-CI runs linting, tests, rule validation, and builds on every PR. Releases are produced automatically when a `v*` tag is pushed (see [`.github/workflows/release.yml`](.github/workflows/release.yml)).
+CI runs type-checks, tests, rule validation, and builds on every PR, across Windows, macOS, and Linux. Releases are produced automatically when a `v*` tag is pushed (see [`.github/workflows/release.yml`](.github/workflows/release.yml)).
 
 ## Languages
 
