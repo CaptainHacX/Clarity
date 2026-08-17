@@ -11,7 +11,22 @@ const electronMock = vi.hoisted(() => ({
   systemPreferences: { getMediaAccessStatus: vi.fn() },
 }))
 
-const coreWlanMock = vi.hoisted(() => ({ coreWlanScan: vi.fn() }))
+// `coreWlanLocationAuthStatus` returns null here so these cases exercise the
+// inference fallback. The authoritative native path — where CoreLocation is
+// asked directly — is covered separately below.
+const coreWlanMock = vi.hoisted(() => ({
+  coreWlanScan: vi.fn(),
+  coreWlanLocationAuthStatus: vi.fn(() => null as number | null),
+  coreWlanLocationServicesEnabled: vi.fn(() => null as boolean | null),
+  // The real mapping — a pure switch, so there is nothing to fake and stubbing
+  // it would only let the mock drift from the behaviour under test.
+  locationAccessFromAuthStatus: (status: number): string => {
+    if (status === 3 || status === 4) return 'granted'
+    if (status === 1 || status === 2) return 'denied'
+    if (status === 0) return 'not-determined'
+    return 'unknown'
+  },
+}))
 
 vi.mock('systeminformation', () => siMock)
 vi.mock('electron', () => electronMock)
@@ -144,6 +159,10 @@ describe('collectNetworkSecurityStatus', () => {
     siMock.networkGatewayDefault.mockReset()
     coreWlanMock.coreWlanScan.mockReset()
     coreWlanMock.coreWlanScan.mockResolvedValue(scanResult())
+    coreWlanMock.coreWlanLocationAuthStatus.mockReset()
+    coreWlanMock.coreWlanLocationAuthStatus.mockReturnValue(null)
+    coreWlanMock.coreWlanLocationServicesEnabled.mockReset()
+    coreWlanMock.coreWlanLocationServicesEnabled.mockReturnValue(null)
     vi.stubGlobal('process', { ...process, platform: 'darwin' })
   })
 
@@ -168,6 +187,30 @@ describe('collectNetworkSecurityStatus', () => {
   it('returns unknown when CoreWLAN itself could not be reached', async () => {
     coreWlanMock.coreWlanScan.mockResolvedValue(scanResult({ ok: false }))
     await expect(collectLocationAccess()).resolves.toBe('unknown')
+  })
+
+  // With the native addon loaded, CoreLocation is asked directly rather than
+  // inferred from whether BSSIDs came back. This is what makes a granted app
+  // report "granted" — the inference could not, because the process it inferred
+  // from (`osascript`) never saw the grant.
+  it('trusts the native authorization status over the BSSID inference', async () => {
+    // Every BSSID withheld — inference alone would say not-determined.
+    coreWlanMock.coreWlanScan.mockResolvedValue(scanResult({ networks: [{ bssid: null }] }))
+    coreWlanMock.coreWlanLocationAuthStatus.mockReturnValue(3) // authorizedAlways
+    coreWlanMock.coreWlanLocationServicesEnabled.mockReturnValue(true)
+    await expect(collectLocationAccess()).resolves.toBe('granted')
+  })
+
+  it('reports not-determined from the native status', async () => {
+    coreWlanMock.coreWlanLocationAuthStatus.mockReturnValue(0)
+    coreWlanMock.coreWlanLocationServicesEnabled.mockReturnValue(true)
+    await expect(collectLocationAccess()).resolves.toBe('not-determined')
+  })
+
+  it('reports denied when the system-wide Location switch is off, whatever the app was granted', async () => {
+    coreWlanMock.coreWlanLocationAuthStatus.mockReturnValue(3)
+    coreWlanMock.coreWlanLocationServicesEnabled.mockReturnValue(false)
+    await expect(collectLocationAccess()).resolves.toBe('denied')
   })
 
   it('exposes the Location permission in the collected status', async () => {
@@ -218,7 +261,7 @@ describe('collectNetworkSecurityStatus', () => {
     expect(status.wifi.securitySummary).toBe('none')
   })
 
-  it('detects VPN tunnels via interface names', async () => {
+  it('detects a tunnel that carries an address as a connected VPN', async () => {
     siMock.wifiConnections.mockResolvedValue([conn()])
     siMock.wifiNetworks.mockResolvedValue([])
     siMock.networkInterfaces.mockResolvedValue([
@@ -230,6 +273,26 @@ describe('collectNetworkSecurityStatus', () => {
     const status = await collectNetworkSecurityStatus()
     expect(status.vpn.detected).toBe(true)
     expect(status.vpn.interfaces).toContain('utun3')
+  })
+
+  it('does not report a VPN for the idle utuns macOS keeps on every machine', async () => {
+    // The regression: matching interface names alone said "VPN active" on a Mac
+    // with no VPN, because iCloud Private Relay / Continuity leave utun0-3
+    // present with nothing but a link-local IPv6.
+    siMock.wifiConnections.mockResolvedValue([conn()])
+    siMock.wifiNetworks.mockResolvedValue([])
+    siMock.networkInterfaces.mockResolvedValue([
+      iface(),
+      iface({ iface: 'utun0', ip4: '', ip6: 'fe80::9eb6:1def:2f19:d938', virtual: true }),
+      iface({ iface: 'utun1', ip4: '', ip6: 'fe80::8c03:9d44:778d:85bc', virtual: true }),
+      iface({ iface: 'utun2', ip4: '', ip6: 'fe80::d5df:a899:b1ef:346b', virtual: true }),
+      iface({ iface: 'utun3', ip4: '', ip6: 'fe80::ce81:b1c:bd2c:69e', virtual: true }),
+    ])
+    siMock.networkGatewayDefault.mockResolvedValue('192.168.1.1')
+
+    const status = await collectNetworkSecurityStatus()
+    expect(status.vpn.detected).toBe(false)
+    expect(status.vpn.interfaces).toEqual([])
   })
 
   it('skips virtual/internal interfaces when picking the primary IPv4', async () => {

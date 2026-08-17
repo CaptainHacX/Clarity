@@ -1,4 +1,5 @@
 import * as si from 'systeminformation'
+import { getPublicIp } from './public-ip'
 import type {
   LocationAccessStatus,
   NetworkInterfaceInfo,
@@ -9,10 +10,67 @@ import type {
 } from '../../shared/types'
 
 /**
- * Tunnel-style interfaces that indicate a VPN or other secure tunnel is up.
- * Matched by name so we never have to make an external call to decide.
+ * Interface names used by VPNs and other point-to-point tunnels.
+ *
+ * A name match alone is *not* a VPN — see `isActiveVpnInterface`. macOS creates
+ * `utun0`…`utun3` on essentially every Mac for iCloud Private Relay, Continuity
+ * and AirDrop sidebands, so their existence said "VPN active" on a machine with
+ * no VPN at all.
  */
-const VPN_IFACE_RE = /^(utun|tun|tap|ppp|wg[0-9]*|ipsec|nordlynx|tailscale|zero|utun[0-9]+)/i
+const VPN_IFACE_RE = /^(utun|tun|tap|ppp|wg[0-9]*|ipsec|nordlynx|tailscale|zt)/i
+
+/** IPv6 link-local. Assigned to an idle tunnel, so it proves nothing. */
+const IPV6_LINK_LOCAL_RE = /^fe80:/i
+
+/**
+ * Does this interface hold an address that could actually carry traffic?
+ *
+ * `0.0.0.0` means up-but-unconfigured, and `fe80::` is auto-assigned to a
+ * tunnel whether or not anything is using it. Either way there is no route.
+ */
+function hasRoutableAddress(iface: NetworkInterfaceInfo): boolean {
+  const ip4 = iface.ip4?.trim()
+  if (ip4 && ip4 !== '0.0.0.0') return true
+  const ip6 = iface.ip6?.trim()
+  if (ip6 && !IPV6_LINK_LOCAL_RE.test(ip6) && ip6 !== '::') return true
+  return false
+}
+
+/**
+ * Is this a tunnel that is genuinely up and carrying a VPN?
+ *
+ * Requires a tunnel-style name *and* a routable address: a VPN that is actually
+ * connected has an address assigned inside the tunnel, while the dormant
+ * `utun`s macOS keeps around have only a link-local IPv6. An interface the OS
+ * reports as explicitly `down` is excluded regardless.
+ *
+ * Exported for tests.
+ */
+export function isActiveVpnInterface(iface: NetworkInterfaceInfo): boolean {
+  if (!VPN_IFACE_RE.test(iface.iface)) return false
+  if (iface.operstate && iface.operstate.toLowerCase() === 'down') return false
+  return hasRoutableAddress(iface)
+}
+
+/**
+ * Is this an RFC1918 / CGNAT / link-local IPv4 — i.e. not reachable from the
+ * internet? Used to label the address honestly rather than calling a LAN
+ * address "public". Exported for tests.
+ */
+export function isPrivateIpv4(ip: string | null | undefined): boolean {
+  if (!ip) return false
+  const parts = ip.trim().split('.')
+  if (parts.length !== 4) return false
+  const [a, b] = parts.map((p) => Number.parseInt(p, 10))
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false
+  if (a === 10) return true                      // 10.0.0.0/8
+  if (a === 127) return true                     // loopback
+  if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
+  if (a === 192 && b === 168) return true        // 192.168.0.0/16
+  if (a === 169 && b === 254) return true        // link-local
+  if (a === 100 && b >= 64 && b <= 127) return true // 100.64.0.0/10 CGNAT
+  return false
+}
 
 /** Encryption strings we treat as too weak for a modern network. */
 const WEAK_SECURITY_RE = /wep|open/i
@@ -65,10 +123,40 @@ export function toSignalPercent(signalDbm: number | null | undefined): number | 
  * then. Resolved through a dynamic import so the module stays unit-testable
  * outside Electron.
  */
+/**
+ * One deferred load of the CoreWLAN module, shared by everything here that needs
+ * it.
+ *
+ * Deferred (rather than a top-level import) so this module stays unit-testable
+ * outside Electron — CoreWLAN pulls in the native addon. Single call site so the
+ * bundler reports one dynamic edge instead of one per consumer.
+ */
+function loadCoreWlan(): Promise<typeof import('./wifi/corewlan')> {
+  return import('./wifi/corewlan')
+}
+
 export async function collectLocationAccess(): Promise<LocationAccessStatus> {
   if (process.platform !== 'darwin') return 'unknown'
   try {
-    const { coreWlanScan } = await import('./wifi/corewlan')
+    const {
+      coreWlanScan,
+      coreWlanLocationAuthStatus,
+      coreWlanLocationServicesEnabled,
+      locationAccessFromAuthStatus,
+    } = await loadCoreWlan()
+
+    // Authoritative when the native addon is loaded: CoreLocation's own answer
+    // for this process, rather than a guess from its side effects. Guarded by a
+    // typeof check so a build (or a test double) without these exports falls
+    // through to the inference below instead of throwing.
+    const status = typeof coreWlanLocationAuthStatus === 'function' ? coreWlanLocationAuthStatus() : null
+    if (status != null) {
+      const enabled =
+        typeof coreWlanLocationServicesEnabled === 'function' ? coreWlanLocationServicesEnabled() : null
+      if (enabled === false) return 'denied'
+      if (typeof locationAccessFromAuthStatus === 'function') return locationAccessFromAuthStatus(status)
+    }
+
     const scan = await coreWlanScan(false)
     if (!scan.ok) return 'unknown'
     const anyBssid = scan.networks.some((n) => n.bssid) || scan.current?.bssid != null
@@ -79,6 +167,68 @@ export async function collectLocationAccess(): Promise<LocationAccessStatus> {
     return 'not-determined'
   } catch {
     return 'unknown'
+  }
+}
+
+/**
+ * Fill in the connected network's SSID and BSSID from CoreWLAN on macOS.
+ *
+ * `si.wifiConnections()` reads `system_profiler`, which redacts both for a
+ * process without Location access — so the panel showed "hidden" even once the
+ * grant was in place. CoreWLAN in-process has the real values, and it is the
+ * same source the Wi-Fi scanner uses, so the two views agree instead of
+ * contradicting each other.
+ *
+ * Only fields that are actually missing get overwritten; a value
+ * `system_profiler` did supply is left alone.
+ */
+async function enrichConnectedFromCoreWlan(
+  connected: WifiConnectionInfo | null,
+): Promise<WifiConnectionInfo | null> {
+  if (process.platform !== 'darwin') return connected
+  try {
+    const { coreWlanScan } = await loadCoreWlan()
+    const scan = await coreWlanScan(false)
+    const current = scan.ok ? scan.current : null
+    if (!current) return connected
+
+    // CoreWLAN returns a `current` block whether or not the radio is associated;
+    // every field is null when it isn't. An SSID or a BSSID is what actually
+    // evidences an association, so without either there is no connection to
+    // report and a disconnected machine must stay disconnected.
+    const associated = current.ssid != null || current.bssid != null
+    if (!associated) return connected
+
+    // No connection row at all, but CoreWLAN sees an association: build one.
+    const base: WifiConnectionInfo = connected ?? {
+      ssid: null,
+      ssidRedacted: false,
+      bssid: null,
+      band: null,
+      signalDbm: null,
+      signalPercent: null,
+      channel: null,
+      frequency: null,
+      security: null,
+      securityLevel: 'unknown',
+      txRate: null,
+      quality: null,
+    }
+
+    const ssid = current.ssid && !isRedactedSsid(current.ssid) ? current.ssid : base.ssid
+    return {
+      ...base,
+      ssid,
+      // Redaction is only still true if neither source produced a name.
+      ssidRedacted: ssid == null ? base.ssidRedacted : false,
+      bssid: base.bssid ?? current.bssid,
+      signalDbm: base.signalDbm ?? current.rssi,
+      signalPercent: base.signalPercent ?? toSignalPercent(current.rssi),
+      channel: base.channel ?? current.channel,
+      txRate: base.txRate ?? current.txRate,
+    }
+  } catch {
+    return connected
   }
 }
 
@@ -167,13 +317,27 @@ export async function collectNetworkSecurityStatus(): Promise<NetworkSecuritySta
     : []
 
   const connectionRaw = connections.status === 'fulfilled' ? connections.value?.[0] : undefined
-  const connected = mapConnection(connectionRaw)
+  const connected = await enrichConnectedFromCoreWlan(mapConnection(connectionRaw))
 
   const nearbyNetworks: NearbyWifiInfo[] = nearby.status === 'fulfilled'
     ? nearby.value.map(mapNearby).filter((n) => n.ssid || n.bssid)
     : []
 
-  const vpnIfaces = mappedIfaces.filter((i) => VPN_IFACE_RE.test(i.iface))
+  // Only tunnels that actually carry an address count. Matching the name alone
+  // reported "VPN active" on every Mac, because of the idle utun0-3 macOS keeps.
+  const vpnIfaces = mappedIfaces.filter(isActiveVpnInterface)
+
+  // Needs the local identity first, so a network change invalidates the cached
+  // answer. Guarded rather than awaited bare: an unreachable internet must slow
+  // this scan by the lookup's own short budget at most, and never fail it.
+  const localIpv4 = pickPrimaryIp(mappedIfaces, true)
+  const gatewayAddr = gateway.status === 'fulfilled' ? (gateway.value || null) : null
+  let publicIp: NetworkSecurityStatus['publicIp'] = { address: null, state: 'unknown', checkedAt: null }
+  try {
+    publicIp = await getPublicIp(localIpv4, gatewayAddr)
+  } catch {
+    publicIp = { address: null, state: 'offline', checkedAt: Date.now() }
+  }
 
   let securitySummary: NetworkSecurityStatus['wifi']['securitySummary'] = 'none'
   if (connected) {
@@ -188,12 +352,13 @@ export async function collectNetworkSecurityStatus(): Promise<NetworkSecuritySta
       securitySummary,
     },
     interfaces: mappedIfaces,
-    gateway: gateway.status === 'fulfilled' ? (gateway.value || null) : null,
+    gateway: gatewayAddr,
     vpn: {
       detected: vpnIfaces.length > 0,
       interfaces: vpnIfaces.map((i) => i.iface),
     },
-    ipv4: pickPrimaryIp(mappedIfaces, true),
+    ipv4: localIpv4,
+    publicIp,
     ipv6: pickPrimaryIp(mappedIfaces, false),
     locationAccess: locationAccess.status === 'fulfilled' ? locationAccess.value : 'unknown',
   }

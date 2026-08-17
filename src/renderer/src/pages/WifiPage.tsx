@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -27,10 +27,14 @@ import { Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis }
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorAlert } from '@/components/shared/ErrorAlert'
+import { ConnectionPanel } from '@/components/network/wifi/ConnectionPanel'
+import { InterfacesPanel } from '@/components/network/wifi/InterfacesPanel'
+import { LocationBanner } from '@/components/network/wifi/LocationBanner'
 import { cn } from '@/lib/utils'
 import { useWifiStore, type WifiSortBy } from '@/stores/wifi-store'
+import { useNetworkSecurityStore } from '@/stores/network-security-store'
 import { signalBucket, wifiNetworkKey, type WifiSignalBucket } from '@shared/wifi'
-import type { WifiExportPayload, WifiNetworkDetail, WifiSecurityLevel } from '@shared/types'
+import type { NetworkSecurityStatus, WifiExportPayload, WifiNetworkDetail, WifiSecurityLevel } from '@shared/types'
 
 const SECURITY_META: Record<WifiSecurityLevel, { color: string; bg: string; icon: typeof Lock }> = {
   secured: { color: '#22c55e', bg: 'rgba(34,197,94,0.10)', icon: Lock },
@@ -112,6 +116,17 @@ function maskName(key: string, order: string[]): string {
   return `Network #${idx >= 0 ? idx + 1 : order.length + 1}`
 }
 
+/**
+ * Has macOS withheld SSIDs from the link snapshot?
+ *
+ * The scanner reports this as `snapshot.bssidHidden`; the link snapshot reports
+ * it per-network instead, so it has to be derived. Either one being true means
+ * Location access is missing.
+ */
+function isWifiRedacted(status: NetworkSecurityStatus): boolean {
+  return !!status.wifi.connected?.ssidRedacted || status.wifi.nearby.some((n) => n.ssidRedacted)
+}
+
 function maskBssid(bssid: string): string {
   const parts = bssid.split(':')
   if (parts.length !== 6) return '••:••:••:••:••:••'
@@ -138,13 +153,30 @@ export function WifiPage() {
   const start = useWifiStore((s) => s.start)
   const stop = useWifiStore((s) => s.stop)
 
-  const [granting, setGranting] = useState(false)
+  // Link-level state (interfaces, VPN, gateway, IP) comes from the former
+  // "WiFi & Network Security" page, which is now the top of this one. Kept as a
+  // separate store because it is a separate IPC call against a separate service.
+  const linkStatus = useNetworkSecurityStore((s) => s.status)
+  const linkScanning = useNetworkSecurityStore((s) => s.scanning)
+  const linkHasScanned = useNetworkSecurityStore((s) => s.hasScanned)
+  const linkScan = useNetworkSecurityStore((s) => s.scan)
+  const linkRequestLocation = useNetworkSecurityStore((s) => s.requestLocation)
 
   useEffect(() => {
     if (!hasScanned) void detailedScan()
     start()
     return () => stop()
   }, [hasScanned, detailedScan, start, stop])
+
+  useEffect(() => {
+    if (!linkHasScanned) void linkScan()
+  }, [linkHasScanned, linkScan])
+
+  /** Refresh means refresh everything on the page, not just the scanner. */
+  const refreshAll = (): void => {
+    void detailedScan()
+    void linkScan()
+  }
 
   const networks = useMemo(() => snapshot?.networks ?? [], [snapshot])
 
@@ -191,16 +223,17 @@ export function WifiPage() {
   }, [selectedSamples])
   const hasNoise = useMemo(() => chartData.some((d) => d.noise != null), [chartData])
 
-  const grantAccess = async () => {
-    setGranting(true)
-    try {
-      const outcome = await requestLocation()
-      if (outcome === 'granted') toast.success(t('locationGranted'))
-      else if (outcome === 'settings') toast.info(t('locationOpenSettingsHint'))
-      else toast.error(t('locationDenied'))
-    } finally {
-      setGranting(false)
-    }
+  /**
+   * Ask for Location access once for the whole page.
+   *
+   * Both sources are gated on the same macOS permission, so a single grant has
+   * to refresh both — otherwise the banner would disappear while the link panel
+   * kept showing redacted values until the next manual scan.
+   */
+  const grantLocation = async (): Promise<'granted' | 'settings' | 'failed'> => {
+    const outcome = await requestLocation()
+    void linkRequestLocation()
+    return outcome as 'granted' | 'settings' | 'failed'
   }
 
   const handleExport = async () => {
@@ -233,9 +266,23 @@ export function WifiPage() {
     else toast.error(t('exportFailed'))
   }
 
-  const showLocationBanner = snapshot?.bssidHidden === true
+  // One banner for the page. Either source can independently discover that
+  // macOS is withholding BSSIDs, and before the merge each rendered its own —
+  // which on a combined page would have shown the same prompt twice.
+  //
+  // `locationAccess` is the authoritative signal (CoreLocation's own answer for
+  // this process) and it wins outright: a granted app must never be told to go
+  // and grant access. Only when it can't be read do the redaction heuristics
+  // stand in, and `denied`/`restricted` is not offered the prompt at all
+  // because the OS will not raise one a second time.
+  const access = snapshot?.locationAccess ?? linkStatus?.locationAccess ?? 'unknown'
+  const inferredHidden =
+    snapshot?.bssidHidden === true || (linkStatus != null && isWifiRedacted(linkStatus))
+  const showLocationBanner =
+    access === 'granted' ? false : access === 'not-determined' || inferredHidden
   const noRadio = snapshot != null && !snapshot.supported
   const radioOff = snapshot != null && snapshot.supported && !snapshot.powerOn
+  const busy = detailedScanning || linkScanning
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-8">
@@ -258,13 +305,13 @@ export function WifiPage() {
               {t('demoMode')}
             </button>
             <button
-              onClick={() => void detailedScan()}
-              disabled={detailedScanning}
+              onClick={refreshAll}
+              disabled={busy}
               className="flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium text-white transition-all disabled:opacity-60"
               style={{ background: 'var(--accent)' }}
             >
-              {detailedScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" strokeWidth={1.8} />}
-              {detailedScanning ? t('scanningTitle') : t('rescanButton')}
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" strokeWidth={1.8} />}
+              {busy ? t('scanningTitle') : t('rescanButton')}
             </button>
             <button
               onClick={() => void handleExport()}
@@ -281,29 +328,14 @@ export function WifiPage() {
 
       {error && <ErrorAlert message={error} onDismiss={() => useWifiStore.setState({ error: null })} />}
 
-      {showLocationBanner && (
-        <div className="glass-card flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: 'rgba(245,158,11,0.12)' }}>
-              <EyeOff className="h-4 w-4 text-amber-400" strokeWidth={1.8} />
-            </div>
-            <div>
-              <p className="text-[13px] font-medium text-zinc-100">{t('locationBannerTitle')}</p>
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('locationBannerBody')}</p>
-              <p className="mt-1 text-[11px]" style={{ color: 'var(--text-faint)' }}>{t('locationOpenSettings')}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => void grantAccess()}
-            disabled={granting}
-            className="flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium text-white transition-all disabled:opacity-60"
-            style={{ background: 'var(--accent)' }}
-          >
-            {granting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" strokeWidth={1.8} />}
-            {t('locationGrantButton')}
-          </button>
-        </div>
-      )}
+      {showLocationBanner && <LocationBanner onGrant={grantLocation} />}
+
+      {/* ── Connection & link posture ───────────────── */}
+      {/* From the former "WiFi & Network Security" page. Its connected-Wi-Fi grid
+          and nearby list are intentionally absent: the scanner below already
+          shows every field they did, with more detail per network. */}
+      {linkStatus && <ConnectionPanel status={linkStatus} />}
+      {linkStatus && <InterfacesPanel interfaces={linkStatus.interfaces} />}
 
       {noRadio && <EmptyState icon={WifiOff} title={t('noRadioTitle')} description={t('noRadioDesc')} />}
       {radioOff && <EmptyState icon={WifiOff} title={t('radioOffTitle')} description={t('radioOffDesc')} />}
