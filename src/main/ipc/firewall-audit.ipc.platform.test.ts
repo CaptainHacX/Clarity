@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mocks ──
 
-const { mockExecFile, mockCollectLinuxFirewallStatus } = vi.hoisted(() => ({
+const { mockExecFile, mockCollectLinuxFirewallStatus, existingPaths } = vi.hoisted(() => ({
   mockExecFile: vi.fn(),
   mockCollectLinuxFirewallStatus: vi.fn(),
+  // Which program paths existsSync should report as present. Declared per test
+  // rather than read off the runner's disk: staleness drives the risk level, and
+  // /usr/bin/true exists on macOS and Linux but not on Windows, so the real
+  // check made this suite pass on two platforms and fail on the third.
+  existingPaths: new Set<string>(),
 }))
 
 vi.mock('electron', () => ({
@@ -23,6 +28,12 @@ vi.mock('child_process', () => {
 vi.mock('../services/linux-firewall', () => ({
   collectLinuxFirewallStatus: (...args: unknown[]) => mockCollectLinuxFirewallStatus(...args),
 }))
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>()
+  const existsSync = (p: unknown): boolean => existingPaths.has(String(p))
+  return { ...actual, default: { ...actual, existsSync }, existsSync }
+})
 
 import {
   scanFirewallRules,
@@ -51,6 +62,7 @@ function resolveExecFile(stdout: string): void {
 beforeEach(() => {
   mockExecFile.mockReset()
   mockCollectLinuxFirewallStatus.mockReset()
+  existingPaths.clear()
   setPlatform('darwin')
   setUid(501)
 })
@@ -125,6 +137,9 @@ describe('scanFirewallRules on macOS', () => {
   })
 
   it('builds a rule per app, including blocked apps as clean low-risk entries', async () => {
+    // Present on disk, so it is a live rule rather than a stale one. The other
+    // two paths are deliberately absent.
+    existingPaths.add('/usr/bin/true')
     mockExecFile.mockImplementation((file: string, args: string[]) => {
       if (args.includes('--getglobalstate')) {
         return Promise.resolve({ stdout: 'Firewall is enabled. (State = 2)', stderr: '' })

@@ -1,11 +1,26 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { join } from 'path'
 import { mkdirSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
 
-const appPath = join('/tmp', 'clarity-security-service-test-' + process.pid)
+// tmpdir() rather than '/tmp': on Windows the latter resolves against the
+// current drive root, which is not where temp files belong and is not always
+// writable.
+const appPath = join(tmpdir(), 'clarity-security-service-test-' + process.pid)
 
 vi.mock('electron', () => ({
   app: { isPackaged: true, getPath: () => appPath },
+}))
+
+// The service builds its LAN guard from the host's real interfaces. Unmocked,
+// this suite is not hermetic — the guard's verdict depends on whichever network
+// the machine happens to be on — and on Windows si.networkInterfaces() goes out
+// through WMI, slow enough to exceed vitest's 5s timeout and abort the test
+// mid-scan. Pinned to one interface on the same /24 as the fixture devices.
+vi.mock('systeminformation', () => ({
+  networkInterfaces: vi.fn(async () => [
+    { iface: 'en0', ip4: '192.168.1.5', internal: false, virtual: false },
+  ]),
 }))
 
 const scanDevicesMock = vi.fn()
