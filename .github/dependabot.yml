@@ -8,27 +8,59 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - dependencies
+
+    ignore:
+      # vite's major is not ours to choose — electron-vite pins it as a peer.
+      # electron-vite@5 (latest stable) accepts `^5 || ^6 || ^7`, so a vite 8
+      # bump cannot resolve: `npm ci` fails with ERESOLVE before any job runs a
+      # single check, which is why an unrelated Commitlint and License Check go
+      # red too. vite 8 support exists only in electron-vite 6.0.0-beta.
+      #
+      # Remove this entry when electron-vite 6 ships stable. Because vite is
+      # grouped with electron-vite below, dropping it then raises both in one
+      # PR, which is the only combination that installs.
+      - dependency-name: vite
+        update-types:
+          - version-update:semver-major
+
     groups:
+      # Grouped by what must move in lockstep. electron-vite peer-depends on
+      # both electron and vite, so a bump to any one of them alone can produce a
+      # tree npm refuses to install — they belong in a single PR.
       electron:
         patterns:
           - electron
           - electron-builder
-          - electron-vite
           - electron-updater
+          - electron-vite
+          - vite
+
       react:
         patterns:
           - react
           - react-dom
           - react-router-dom
           - "@types/react*"
+        # React majors are breaking by nature and want their own PR to review.
+        update-types:
+          - minor
+          - patch
+
+      # Minor and patch only, deliberately. Grouped majors are all-or-nothing:
+      # one unmergeable entry blocks every other update in the PR. That is
+      # exactly how a single unsupported vite 8 bump also stalled TypeScript 7,
+      # Vitest 4 and @vitejs/plugin-react 6 in one PR. Majors now arrive
+      # individually, so each can be reviewed — and merged — on its own.
       dev-tools:
         patterns:
           - typescript
-          - vite
           - vitest
           - tailwindcss
           - "@tailwindcss/*"
           - "@vitejs/*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
