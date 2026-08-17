@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 import { randomUUID } from 'crypto'
@@ -123,7 +123,73 @@ export function deepMerge<T extends Record<string, any>>(target: T, source: Part
   return result
 }
 
+/**
+ * Memoized parse of config.json, valid only while the file on disk still
+ * carries the mtime/size it had when we parsed it.
+ *
+ * Reads dominate this module by orders of magnitude — `safeDelete` consults
+ * settings once per deleted file, so a 100k-file clean used to mean 100k
+ * synchronous read + JSON.parse + deepMerge cycles on the main-process event
+ * loop (the same loop that serves IPC and paints the window). Cached reads cost
+ * one `statSync` instead.
+ *
+ * The stamp is what keeps this honest across processes: the elevated instance
+ * (relaunched with --clarity-data-dir) and `--cli` runs write the same file, and
+ * a stale in-memory copy there would silently ignore their changes. Our own
+ * writes drop the cache outright rather than relying on the stamp, because two
+ * writes inside the same millisecond can land on an identical mtime and size.
+ */
+interface StoreCacheEntry {
+  data: StoreData
+  mtimeMs: number
+  size: number
+}
+
+let storeCache: StoreCacheEntry | null = null
+
+/** Drop the memo. Called after every write this process makes. */
+function invalidateStoreCache(): void {
+  storeCache = null
+}
+
+/** Identity of config.json as it sits on disk right now, or null if unreadable. */
+function configStamp(): { mtimeMs: number; size: number } | null {
+  try {
+    const st = statSync(getConfigPath())
+    return { mtimeMs: st.mtimeMs, size: st.size }
+  } catch {
+    // Missing (fresh install, or the data dir was wiped) — no cache can be valid.
+    return null
+  }
+}
+
+/**
+ * Read the store, reusing the memoized parse when config.json is unchanged.
+ *
+ * The returned object is shared with every other cached reader, so callers must
+ * treat it as read-only. Anything that needs to *modify* the store goes through
+ * `runLocked`, which reads fresh via `readStoreUncached` inside the lock.
+ */
 function readStore(): StoreData {
+  const stamp = configStamp()
+  if (
+    storeCache && stamp &&
+    storeCache.mtimeMs === stamp.mtimeMs &&
+    storeCache.size === stamp.size
+  ) {
+    return storeCache.data
+  }
+
+  const data = readStoreUncached()
+  // Re-stamp after parsing rather than reusing the stamp above: the migrations
+  // in readStoreUncached may have rewritten the file, and caching the pre-write
+  // stamp would leave the memo permanently invalid.
+  const fresh = configStamp()
+  storeCache = fresh ? { data, mtimeMs: fresh.mtimeMs, size: fresh.size } : null
+  return data
+}
+
+function readStoreUncached(): StoreData {
   ensureDir()
   try {
     if (existsSync(getConfigPath())) {
@@ -219,20 +285,33 @@ function writeStore(data: StoreData): void {
   const tmp = `${target}.${process.pid}.tmp`
 
   let lastErr: unknown
-  for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt++) {
-    try {
-      writeFileSync(tmp, json, 'utf-8')
-      renameSync(tmp, target)
-      return
-    } catch (err) {
-      lastErr = err
-      try { unlinkSync(tmp) } catch { /* nothing to clean up */ }
-      if (attempt < WRITE_ATTEMPTS) sleepSync(WRITE_RETRY_MS)
+  try {
+    for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt++) {
+      try {
+        writeFileSync(tmp, json, 'utf-8')
+        renameSync(tmp, target)
+        return
+      } catch (err) {
+        lastErr = err
+        try { unlinkSync(tmp) } catch { /* nothing to clean up */ }
+        if (attempt < WRITE_ATTEMPTS) sleepSync(WRITE_RETRY_MS)
+      }
     }
+    throw lastErr
+  } finally {
+    // Unconditional: even a write that ultimately threw may have renamed
+    // successfully on an earlier attempt, so the memo can no longer be trusted.
+    invalidateStoreCache()
   }
-  throw lastErr
 }
 
+/**
+ * Current settings.
+ *
+ * Read-only: the returned object is shared between callers while the memo is
+ * valid, so mutating it would corrupt what every other reader sees without ever
+ * reaching disk. Change settings through `setSettings` instead.
+ */
 export function getSettings(): ClaritySettings {
   return readStore().settings
 }
@@ -258,7 +337,10 @@ function runLocked(what: string, mutate: (data: StoreData) => boolean | void): P
   writeLock = new Promise<void>((r) => { unlock = r })
   return prev.then(() => {
     try {
-      const data = readStore()
+      // Uncached on purpose: the whole point of the lock is that `mutate` runs
+      // on state read *inside* it, and a memoized copy could predate a write
+      // made by the elevated instance or a --cli run.
+      const data = readStoreUncached()
       if (mutate(data) === false) return
       writeStore(data)
     } catch (err) {

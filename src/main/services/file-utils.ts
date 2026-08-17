@@ -81,10 +81,21 @@ async function secureOverwrite(filePath: string): Promise<void> {
   }
 }
 
-export async function safeDelete(filePath: string): Promise<DeleteResult> {
+export interface SafeDeleteOptions {
+  /**
+   * Overrides the `cleaner.secureDelete` setting lookup.
+   *
+   * Callers deleting in a loop should read the setting once and pass it here:
+   * settings are memoized but still cost a `statSync` per lookup, and the answer
+   * cannot meaningfully change part-way through a single clean.
+   */
+  secureDelete?: boolean
+}
+
+export async function safeDelete(filePath: string, opts: SafeDeleteOptions = {}): Promise<DeleteResult> {
   try {
-    const settings = getSettings()
-    if (settings.cleaner.secureDelete) {
+    const secureDelete = opts.secureDelete ?? getSettings().cleaner.secureDelete
+    if (secureDelete) {
       try {
         await secureOverwrite(filePath)
       } catch {
@@ -182,7 +193,10 @@ export async function cleanItems(
   // Opt-in audit trail of what was removed (issue #247). Buffered so a clean of
   // 100k files doesn't turn into 100k appends, and flushed as we go so a crash
   // mid-clean still leaves a record of everything deleted up to that point.
-  const logDeletions = getSettings().cleaner.keepDeletionLog === true
+  // Read once for the whole clean rather than per file — see SafeDeleteOptions.
+  const settings = getSettings()
+  const logDeletions = settings.cleaner.keepDeletionLog === true
+  const secureDelete = settings.cleaner.secureDelete === true
   const pending: DeletedFileRecord[] = []
   const flushPending = (): void => {
     if (pending.length === 0) return
@@ -209,7 +223,7 @@ export async function cleanItems(
     // recorded, so a failed delete never leaves phantom entries behind.
     const descendants = rootInfo?.isDirectory() ? await listDescendantFiles(item.path) : null
 
-    const result = await safeDelete(item.path)
+    const result = await safeDelete(item.path, { secureDelete })
     if (result.success) {
       totalCleaned += item.size
       filesDeleted++
