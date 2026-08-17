@@ -1,3 +1,22 @@
+# [1.1.0](https://github.com/CaptainHacX/Clarity/compare/v1.0.3...v1.1.0) (2026-08-17)
+
+### Bug Fixes
+
+* **network:** correct VPN detection and separate local from public IP ([c238184](https://github.com/CaptainHacX/Clarity/commit/c2381847f995fa33ad36ffbc989735ccd3fb5496))
+
+### Features
+
+* **brand:** new logo and a regenerable icon pipeline ([de8cf71](https://github.com/CaptainHacX/Clarity/commit/de8cf714144aea5a583d2145e14b7cf6a1c1aef3))
+* **cve:** version-accurate findings, remediation plan, coverage and KEV ([7ded32b](https://github.com/CaptainHacX/Clarity/commit/7ded32bc01a4e9c84ad3b56c1be6903416a9c8a4))
+* **network:** consolidate the network section into four tabs ([b37c6b5](https://github.com/CaptainHacX/Clarity/commit/b37c6b55f1a28a5edce20cfb67502d5903c81e1b))
+* **ports:** enumerate ports on Windows ([53d9776](https://github.com/CaptainHacX/Clarity/commit/53d9776b94b048e1e31ba8b9643b9cf1f055b3f7))
+* **tray:** redraw the menu glyphs and refresh them on theme change ([00559f2](https://github.com/CaptainHacX/Clarity/commit/00559f295537fe818ecbd05120e9b5da226e4287))
+* **wifi:** read CoreWLAN in-process so the Location grant applies ([0396367](https://github.com/CaptainHacX/Clarity/commit/039636758d4d283549c23d348a67092f25a805bc))
+
+### Performance Improvements
+
+* **settings:** memoize config.json reads ([7384646](https://github.com/CaptainHacX/Clarity/commit/7384646c39a5db8cefbc67db7d946d5009abb013))
+
 # [1.0.3](https://github.com/CaptainHacX/Clarity/releases/tag/v1.0.3) (2026-08-15)
 
 ### Features
