@@ -31,6 +31,7 @@ export function psUtf8(command: string): string {
 const ALLOWED_TOOLS = new Set([
   'reg', 'reg.exe',
   'netsh', 'netsh.exe',
+  'netstat', 'netstat.exe',
   'pnputil', 'pnputil.exe',
   'schtasks', 'schtasks.exe',
   'ipconfig', 'ipconfig.exe',

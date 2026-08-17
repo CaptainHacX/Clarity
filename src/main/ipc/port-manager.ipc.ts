@@ -6,13 +6,10 @@ import type { PortKillResult, PortScanResult } from '../../shared/types'
 /**
  * Port Manager IPC.
  *
- * The feature is currently Linux + macOS only. On Windows the registration is
- * a no-op; the renderer hides the navigation entry via `features.portManager`
- * and the store refuses to scan.
+ * Registered on every platform. Windows enumerates sockets through netstat
+ * rather than systeminformation — see the port-monitor module header.
  */
 export function registerPortManagerIpc(): void {
-  if (process.platform === 'win32') return
-
   ipcMain.handle(IPC.PORT_SCAN, async (): Promise<PortScanResult> => {
     return scanPorts()
   })

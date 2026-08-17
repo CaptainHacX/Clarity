@@ -114,7 +114,8 @@ export function registerCleanerIpc(getWindow: WindowGetter): void {
       gameMode: isWin,
       firewallAudit: true,
       contextMenu: isWin,
-      portManager: !isWin,
+      // Windows included: port enumeration goes through netstat there.
+      portManager: true,
     },
   }))
 

@@ -5,20 +5,31 @@
  * one (PID, command line, user, best-effort service name), and terminates a
  * process to free the ports it holds.
  *
- * Linux + macOS only. The IPC layer guards against Windows.
+ * Works on Windows, macOS, and Linux.
+ *
+ * Socket enumeration is platform-split. macOS and Linux go through
+ * `systeminformation`. Windows does not: that library's win32 branch parses
+ * `netstat -nao` as though every row were TCP-shaped, reading the state from
+ * column 4 and the PID from column 5 — but Windows gives UDP rows only four
+ * columns, with no State. Every UDP row would come back with a bogus state and
+ * the *wrong PID*, and a wrong PID is a process we would terminate by mistake.
+ * So win32 parses netstat itself, in `parseNetstatAno`.
  *
  * Security notes:
  *  - All termination goes through `process.kill(pid, signal)` with a validated
  *    numeric PID. No user input is ever interpolated into a shell command.
  *  - Critical system processes and Clarity itself can never be killed.
  *  - Terminate uses SIGTERM first (graceful) and only escalates to SIGKILL if
- *    the process is still alive after a short grace period.
+ *    the process is still alive after a short grace period. Windows has no
+ *    signals: Node ignores the name and terminates outright, so both passes
+ *    behave the same there. Harmless, and it keeps one code path.
  */
 
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { readFile } from 'fs/promises'
 import * as si from 'systeminformation'
+import { execNativeUtf8, psUtf8 } from './exec-utf8'
 import type {
   PortEntry,
   PortScanResult,
@@ -92,6 +103,85 @@ export function isListenerSocket(sock: { protocol: 'tcp' | 'udp'; state: string;
   if (sock.protocol === 'tcp') return sock.state.toUpperCase() === 'LISTEN'
   // UDP has no LISTEN state; a socket bound without a peer is an open port.
   return sock.peerPort === '*' || sock.peerAddress === '*' || sock.peerAddress === '0.0.0.0' || sock.peerAddress === '::'
+}
+
+/**
+ * Split a Windows `netstat` address column into host and port.
+ *
+ * Handles `0.0.0.0:135`, `[::]:135`, `[::1]:1900`, and the `*:*` that UDP rows
+ * carry as their foreign address. Splits on the *last* colon so IPv6 literals
+ * survive; the surrounding brackets are dropped.
+ */
+export function splitNetstatAddress(field: string): { host: string; port: string } {
+  const idx = field.lastIndexOf(':')
+  if (idx === -1) return { host: field, port: '' }
+  const host = field.slice(0, idx).replace(/^\[|\]$/g, '')
+  return { host, port: field.slice(idx + 1) }
+}
+
+/**
+ * Parse the output of Windows `netstat -ano`.
+ *
+ * Two row shapes, which is the whole reason this exists:
+ *
+ *   TCP    0.0.0.0:135    0.0.0.0:0    LISTENING    1044     (5 columns)
+ *   UDP    0.0.0.0:500    *:*                       4340     (4 columns, no State)
+ *
+ * State words are localized by Windows ("ABHÖREN" on a German install), so they
+ * are not load-bearing: a TCP row whose foreign port is 0 is a listener
+ * regardless of what the State column says, and that is what decides
+ * `isListenerSocket`. The English spellings are still normalized so the state
+ * shown in the UI reads correctly on an English install.
+ */
+export function parseNetstatAno(stdout: string): NormalizedSocket[] {
+  const out: NormalizedSocket[] = []
+
+  for (const rawLine of stdout.split(/\r?\n/)) {
+    const parts = rawLine.trim().split(/\s+/)
+    if (parts.length < 4) continue
+
+    const protocol = normalizeProtocol(parts[0])
+    if (!protocol) continue
+
+    const local = splitNetstatAddress(parts[1])
+    const localPort = parsePort(local.port)
+    if (localPort === null) continue
+
+    const peer = splitNetstatAddress(parts[2])
+
+    // TCP carries State then PID; UDP goes straight to PID.
+    const isTcp = protocol === 'tcp'
+    const pidField = isTcp ? parts[4] : parts[3]
+    const stateField = isTcp ? parts[3] : ''
+    // A TCP row missing its 5th column is malformed, not a UDP row.
+    if (isTcp && parts.length < 5) continue
+
+    let state = normalizeNetstatState(stateField)
+    // Language-independent listener test, and the only one that is trustworthy.
+    if (isTcp && peer.port === '0') state = 'LISTEN'
+
+    out.push({
+      protocol,
+      localAddress: local.host || '*',
+      localPort,
+      peerAddress: peer.host || '*',
+      peerPort: peer.port || '',
+      state,
+      pid: parsePid(pidField),
+      processPath: null,
+    })
+  }
+
+  return out
+}
+
+/** Map Windows state spellings onto the ones the rest of the module expects. */
+function normalizeNetstatState(state: string): string {
+  const upper = state.trim().toUpperCase()
+  if (!upper) return 'UNKNOWN'
+  // Windows says LISTENING; every other platform (and our UI) says LISTEN.
+  if (upper === 'LISTENING') return 'LISTEN'
+  return upper
 }
 
 function basenameOf(p: string | null): string | null {
@@ -237,8 +327,16 @@ function dominantState(states: string[]): string {
 }
 
 function isCurrentUser(user: string): boolean {
-  const effective = process.env.USER ?? process.env.LOGNAME ?? ''
-  if (effective && user === effective) return true
+  // USERNAME is the Windows spelling. Without it every Windows row compared
+  // against '' and was reported as owned by another user, which lit the
+  // "needs admin" badge on every single port.
+  const effective = process.env.USER ?? process.env.LOGNAME ?? process.env.USERNAME ?? ''
+  if (!effective) return false
+  if (user === effective) return true
+  // Windows reports the owner as DOMAIN\user (or MACHINE\user); compare the
+  // account part so a domain-joined machine doesn't read as "another user".
+  const account = user.includes('\\') ? user.slice(user.lastIndexOf('\\') + 1) : user
+  if (account.toLowerCase() === effective.toLowerCase()) return true
   // On macOS, systeminformation reports uid-based names like "_spotlight".
   // Processes we own are usually the login user; treat uid-string prefixes as "other".
   return false
@@ -306,6 +404,59 @@ async function resolveMacosServiceNames(pids: number[], cache: Map<number, strin
   }
 }
 
+/**
+ * Map PID → Windows service name.
+ *
+ * One PowerShell call for the whole table rather than one per PID: svchost.exe
+ * hosts dozens of services and would otherwise mean dozens of process spawns
+ * per scan. A PID hosting several services gets them joined, which is the honest
+ * answer for a shared svchost.
+ */
+export function parseWindowsServiceCsv(stdout: string): Map<number, string> {
+  const byPid = new Map<number, string[]>()
+  for (const line of stdout.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    // ConvertTo-Csv quotes every field: "1044","RpcSs"
+    const match = trimmed.match(/^"?(\d+)"?\s*,\s*"?(.*?)"?$/)
+    if (!match) continue
+    const pid = parsePid(match[1])
+    const name = match[2].trim()
+    if (pid === null || !name) continue
+    const existing = byPid.get(pid)
+    if (existing) {
+      if (!existing.includes(name)) existing.push(name)
+    } else {
+      byPid.set(pid, [name])
+    }
+  }
+  const out = new Map<number, string>()
+  for (const [pid, names] of byPid) out.set(pid, names.join(', '))
+  return out
+}
+
+async function resolveWindowsServiceNames(pids: number[], cache: Map<number, string | null>): Promise<void> {
+  const remaining = pids.filter((p) => !cache.has(p))
+  for (const pid of remaining) cache.set(pid, null)
+  if (remaining.length === 0) return
+
+  try {
+    const script =
+      'Get-CimInstance Win32_Service | Where-Object { $_.ProcessId -gt 0 } | ' +
+      'Select-Object ProcessId,Name | ConvertTo-Csv -NoTypeInformation'
+    const { stdout } = await execFileAsync('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command', psUtf8(script),
+    ], { timeout: 8000, encoding: 'utf-8', windowsHide: true })
+    const byPid = parseWindowsServiceCsv(stdout)
+    for (const pid of remaining) {
+      cache.set(pid, byPid.get(pid) ?? null)
+    }
+  } catch {
+    // PowerShell unavailable or blocked — service names stay null, which the
+    // UI already renders as an em dash.
+  }
+}
+
 async function resolveServiceNames(
   pids: (number | null)[],
   cache: Map<number, string | null>
@@ -315,6 +466,8 @@ async function resolveServiceNames(
     await resolveLinuxServiceNames(unique, cache)
   } else if (process.platform === 'darwin') {
     await resolveMacosServiceNames(unique, cache)
+  } else if (process.platform === 'win32') {
+    await resolveWindowsServiceNames(unique, cache)
   }
   return cache
 }
@@ -335,8 +488,18 @@ function buildProcessMap(procList: si.Systeminformation.ProcessesProcessData[]):
   return map
 }
 
-/** Fetch all sockets and normalize them into a testable shape. */
+/**
+ * Fetch all sockets and normalize them into a testable shape.
+ *
+ * Windows goes through netstat directly — see the module header for why
+ * systeminformation's win32 branch is not usable here.
+ */
 export async function fetchSockets(): Promise<NormalizedSocket[]> {
+  if (process.platform === 'win32') {
+    const { stdout } = await execNativeUtf8('netstat', ['-ano'], { timeout: 15_000 })
+    return parseNetstatAno(stdout)
+  }
+
   const raw = await si.networkConnections()
   const out: NormalizedSocket[] = []
   for (const r of raw) {
