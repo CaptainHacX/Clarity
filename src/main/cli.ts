@@ -47,6 +47,52 @@ function log(msg: string): void {
   process.stdout.write(msg + '\n')
 }
 
+/** How long to wait for stdout to drain before exiting regardless. */
+const FLUSH_TIMEOUT_MS = 5000
+
+/**
+ * Exit, but not before stdout has actually left the process.
+ *
+ * `app.exit` terminates immediately. When stdout is a pipe — which is the
+ * scripted case this CLI exists for, `clarity --cli scan --json | jq` — Node
+ * flushes writes asynchronously, so exiting right after a write truncates the
+ * output at the pipe buffer: 64 KiB on macOS. A `--json` scan of a busy machine
+ * runs to megabytes, so consumers received JSON cut mid-token while the exit
+ * code still reported success.
+ *
+ * Redirecting to a file or a terminal hid it, because those writes are
+ * synchronous. That is also why CI never caught it: a fresh runner has too few
+ * files for a scan to exceed 64 KiB.
+ *
+ * Writes are ordered, so an empty write's callback lands after everything queued
+ * ahead of it — that makes it a flush barrier. The timeout is a backstop for a
+ * reader that has already gone away (`| head`), so the CLI exits rather than
+ * hanging, and exitCode is set up front so a natural exit still carries it.
+ */
+function exitCli(code: number): void {
+  process.exitCode = code
+  let exited = false
+  const finish = (): void => {
+    if (exited) return
+    exited = true
+    app.exit(code)
+  }
+
+  setTimeout(finish, FLUSH_TIMEOUT_MS).unref()
+
+  const pending = [process.stdout, process.stderr].filter((s) => s.writableLength > 0)
+  if (pending.length === 0) {
+    finish()
+    return
+  }
+  let remaining = pending.length
+  for (const stream of pending) {
+    stream.write('', () => {
+      if (--remaining === 0) finish()
+    })
+  }
+}
+
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -1243,7 +1289,7 @@ async function handleMetricsServer(args: string[], ctx: CliContext): Promise<voi
 
   const shutdown = (): void => {
     server.close()
-    app.exit(ExitCode.SUCCESS)
+    exitCli(ExitCode.SUCCESS)
   }
   process.on('SIGTERM', shutdown)
   process.on('SIGINT', shutdown)
@@ -1374,8 +1420,8 @@ async function runLegacyScanClean(categories: string[], doClean: boolean, ctx: C
 export async function runCli(): Promise<void> {
   const parsed = parseCliArgs(process.argv)
 
-  if (parsed.help) { printHelp(); app.exit(ExitCode.SUCCESS); return }
-  if (parsed.version) { log(`Clarity v${app.getVersion()}`); app.exit(ExitCode.SUCCESS); return }
+  if (parsed.help) { printHelp(); exitCli(ExitCode.SUCCESS); return }
+  if (parsed.version) { log(`Clarity v${app.getVersion()}`); exitCli(ExitCode.SUCCESS); return }
 
   const { ctx } = parsed
 
@@ -1384,7 +1430,7 @@ export async function runCli(): Promise<void> {
   if (cliArgs.includes('--verbose') && (cliArgs.includes('--quiet') || cliArgs.includes('-q'))) {
     if (ctx.json) log(JSON.stringify({ error: 'invalid_args', message: '--verbose and --quiet are mutually exclusive' }))
     else process.stderr.write('Error: --verbose and --quiet are mutually exclusive.\n')
-    app.exit(ExitCode.INVALID_ARGS)
+    exitCli(ExitCode.INVALID_ARGS)
     return
   }
 
@@ -1400,7 +1446,7 @@ export async function runCli(): Promise<void> {
     }
     const doClean = parsed.hasCleanFlag || parsed.command === 'clean'
     const exitCode = await runLegacyScanClean(categories, doClean, ctx)
-    app.exit(exitCode)
+    exitCli(exitCode)
     return
   }
 
@@ -1433,16 +1479,16 @@ export async function runCli(): Promise<void> {
           log(`Unknown command: ${parsed.command}`)
           log('Run clarity --cli --help for usage information.')
         }
-        app.exit(ExitCode.UNKNOWN_COMMAND)
+        exitCli(ExitCode.UNKNOWN_COMMAND)
         return
     }
-    app.exit(exitCode ?? ExitCode.SUCCESS)
+    exitCli(exitCode ?? ExitCode.SUCCESS)
   } catch (err: any) {
     if (ctx.json) {
       log(JSON.stringify({ error: err.message }))
     } else {
       process.stderr.write(`Error: ${err.message}\n`)
     }
-    app.exit(ExitCode.GENERAL_ERROR)
+    exitCli(ExitCode.GENERAL_ERROR)
   }
 }
