@@ -434,6 +434,42 @@ describe('protected path safety', () => {
     const result = await handler({}, ['/home/user/project/node_modules'])
     expect(result.errors.some((e: { path: string; reason: string }) => e.reason.includes('Protected'))).toBe(true)
   })
+
+  // The checks above all name a protected directory directly. The renderer can
+  // pass any absolute path it likes, so the interesting case is a file *inside*
+  // one — a guard that only inspects the last path segment misses every one of
+  // these, which is an irreversible overwrite of exactly the files that matter.
+  const insideProtected = [
+    ['an SSH private key', '/home/user/.ssh/id_rsa'],
+    ['a GPG keyring', '/home/user/.gnupg/secring.gpg'],
+    ['the unix password database', '/etc/passwd'],
+    ['the unix shadow file', '/etc/shadow'],
+    ['a setuid system binary', '/usr/bin/sudo'],
+    ['a system library', '/lib/x86_64-linux-gnu/libc.so.6'],
+    ['macOS private etc', '/private/etc/sudoers'],
+    ['a git object store', '/home/user/project/.git/config'],
+  ] as const
+
+  for (const [label, target] of insideProtected) {
+    it(`blocks ${label} (${target})`, async () => {
+      registerFileShredderIpc(() => null)
+      const handler = getHandler('shredder:shred')
+      const result = await handler({}, [target])
+      expect(
+        result.errors.some((e: { path: string; reason: string }) => e.reason.includes('Protected')),
+      ).toBe(true)
+      expect(result.shredded).toBe(0)
+    })
+  }
+
+  it('still allows an ordinary file whose parent merely shares a system name', async () => {
+    // Guards against over-correcting: `etc` under the user's own Documents is
+    // not the system /etc and must stay shreddable.
+    registerFileShredderIpc(() => null)
+    const handler = getHandler('shredder:shred')
+    const result = await handler({}, ['/home/user/Documents/etc/notes.txt'])
+    expect(result.errors.some((e: { path: string; reason: string }) => e.reason.includes('Protected'))).toBe(false)
+  })
 })
 
 // ── Swap-under-the-shredder (TOCTOU) ──

@@ -46,11 +46,23 @@ function isProtectedPath(targetPath: string): boolean {
   const isRootLevel = process.platform === 'win32' ? segments.length <= 2 : segments.length <= 1
   if (isRootLevel) return true
 
-  // Check against protected name lists
-  const protectedNames = process.platform === 'win32'
-    ? [...PROTECTED_WIN32, ...PROTECTED_GENERIC]
-    : [...PROTECTED_UNIX, ...PROTECTED_GENERIC]
-  if (protectedNames.includes(name)) return true
+  // The lists below used to be matched against basename() alone, which only
+  // refused a protected directory named *directly*. Because the renderer may
+  // pass any absolute path, the paths that actually mattered went straight
+  // through: /etc/passwd, /usr/bin/sudo and ~/.ssh/id_rsa all have an innocent
+  // final segment, and shredding is an irreversible overwrite.
+  //
+  // System directories are only meaningful anchored at the filesystem root —
+  // /etc is the password database, ~/Documents/etc is somebody's notes — so
+  // match the first segment, or the second on Windows where segment 0 is the
+  // drive (`c:`).
+  const systemNames = process.platform === 'win32' ? PROTECTED_WIN32 : PROTECTED_UNIX
+  const rootSegment = segments[process.platform === 'win32' ? 1 : 0]
+  if (rootSegment && systemNames.includes(rootSegment)) return true
+
+  // These hold credentials or version-control state wherever they sit, so every
+  // segment counts: ~/.ssh/id_rsa and project/.git/config must both be refused.
+  if (segments.some((segment) => PROTECTED_GENERIC.includes(segment))) return true
 
   // Never shred user profile root folders
   const userProfileDirs = ['desktop', 'documents', 'downloads', 'pictures', 'videos', 'music', 'onedrive']
