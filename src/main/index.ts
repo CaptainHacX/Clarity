@@ -703,6 +703,25 @@ function createWindow(): void {
     }
   })
 
+  // Whether a navigation target is still the app's own document.
+  //
+  // Compared against where the app is *known* to live rather than against
+  // webContents.getURL(): that is the empty string until the first load
+  // completes, so a guard derived from it would classify the app's own opening
+  // document as external the one time it cannot afford to. Packaged builds load
+  // from file:// (opaque "null" origin, so the scheme is the only usable test);
+  // the dev server has a real http origin that compares properly.
+  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
+  const appOrigin = rendererUrl ? new URL(rendererUrl).origin : null
+  const isInternalNavigation = (target: string): boolean => {
+    try {
+      const t = new URL(target)
+      return appOrigin ? t.origin === appOrigin : t.protocol === 'file:'
+    } catch {
+      return false
+    }
+  }
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     // Only allow opening HTTPS URLs externally
     try {
@@ -714,6 +733,29 @@ function createWindow(): void {
       // Invalid URL, ignore
     }
     return { action: 'deny' }
+  })
+
+  // Navigation lockdown.
+  //
+  // setWindowOpenHandler above only covers window.open and target="_blank". It
+  // does not see in-page navigation, so a link without a target, an HTTP
+  // redirect, or a stray location.href would replace the app with a remote
+  // document *in the window that has the preload bridge attached* — handing that
+  // page the whole IPC surface.
+  //
+  // Nothing here navigates legitimately: routing is react-router operating on
+  // history state, which raises did-navigate-in-page rather than will-navigate.
+  // So the app's own document is allowed through (this is what keeps the dev
+  // server's reload working) and everything else is refused, with https handed
+  // to the real browser for consistency with the handler above.
+  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    if (isInternalNavigation(targetUrl)) return
+    event.preventDefault()
+    try {
+      if (new URL(targetUrl).protocol === 'https:') shell.openExternal(targetUrl)
+    } catch {
+      // Not a URL worth handing anywhere.
+    }
   })
 
   // Register IPC handlers only once to avoid stacking on window recreation
