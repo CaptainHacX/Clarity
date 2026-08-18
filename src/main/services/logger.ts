@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { appendFileSync, mkdirSync, statSync, renameSync, unlinkSync } from 'fs'
 import { app } from 'electron'
+import { homedir } from 'os'
 
 const MAX_LOG_SIZE = 5 * 1024 * 1024 // 5 MB
 const ROTATION_CHECK_INTERVAL_MS = 60_000 // only stat the file every 60s
@@ -41,8 +42,47 @@ function timestamp(): string {
   return new Date().toISOString()
 }
 
+/**
+ * Replace the user's home directory with `~` in anything written to the log.
+ *
+ * Nothing here logs a credential — the app has no accounts and collects no
+ * passwords — but stack traces and error messages carry absolute paths, and on
+ * both macOS (`/Users/<name>`) and Windows (`C:\Users\<name>`) that path embeds
+ * the account name. clarity.log is the file users attach to bug reports, so it
+ * was handing over a real name with every crash. `~/…` keeps the path just as
+ * readable for debugging.
+ *
+ * Resolved lazily and cached: os.homedir() is stable for the process, and the
+ * substitution runs on every log line.
+ */
+let _homeDir: string | null = null
+function homeDir(): string {
+  if (_homeDir === null) {
+    try {
+      _homeDir = homedir()
+    } catch {
+      _homeDir = ''
+    }
+  }
+  return _homeDir
+}
+
+export function redactHome(text: string): string {
+  const home = homeDir()
+  if (!home) return text
+  // Both separators: a Windows path may be reported with either, and JS stack
+  // frames on Windows sometimes carry forward slashes.
+  const variants = [home, home.replace(/\\/g, '/')]
+  let out = text
+  for (const variant of variants) {
+    if (!variant) continue
+    out = out.split(variant).join('~')
+  }
+  return out
+}
+
 export function logInfo(message: string): void {
-  const line = `[${timestamp()}] INFO: ${message}\n`
+  const line = `[${timestamp()}] INFO: ${redactHome(message)}\n`
   try {
     rotateIfNeeded(logFile(), logFileOld())
     appendFileSync(logFile(), line)
@@ -53,7 +93,7 @@ export function logInfo(message: string): void {
 
 export function logError(message: string, error?: unknown): void {
   const errStr = error instanceof Error ? error.message : String(error ?? '')
-  const line = `[${timestamp()}] ERROR: ${message} ${errStr}\n`
+  const line = `[${timestamp()}] ERROR: ${redactHome(message)} ${redactHome(errStr)}\n`
   try {
     rotateIfNeeded(logFile(), logFileOld())
     appendFileSync(logFile(), line)
@@ -64,7 +104,7 @@ export function logError(message: string, error?: unknown): void {
 
 export function logDebug(message: string, data?: unknown): void {
   const extra = data !== undefined ? ` ${JSON.stringify(data)}` : ''
-  const line = `[${timestamp()}] DEBUG: ${message}${extra}\n`
+  const line = `[${timestamp()}] DEBUG: ${redactHome(message)}${redactHome(extra)}\n`
   try {
     rotateIfNeeded(logFile(), logFileOld())
     appendFileSync(logFile(), line)

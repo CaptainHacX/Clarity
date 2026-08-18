@@ -1,7 +1,7 @@
 import { app, crashReporter, dialog } from 'electron'
 import { appendFileSync } from 'fs'
 import { join } from 'path'
-import { logError, logInfo } from './logger'
+import { logError, logInfo, redactHome } from './logger'
 
 const CRASH_SUBMIT_URL = process.env.CLARITY_CRASH_URL || ''
 
@@ -44,7 +44,14 @@ export function installCrashGuard(): void {
 
 function persistCrash(message: string): void {
   try {
-    appendFileSync(join(app.getPath('userData'), 'crash-last.log'), `[${new Date().toISOString()}] ${message}\n`, 'utf-8')
+    // Redacted like every other log write: this file exists to be attached to a
+    // bug report, and an unredacted stack trace carries the account name in
+    // every absolute path.
+    appendFileSync(
+      join(app.getPath('userData'), 'crash-last.log'),
+      `[${new Date().toISOString()}] ${redactHome(message)}\n`,
+      'utf-8',
+    )
   } catch {
     /* best-effort persistence */
   }

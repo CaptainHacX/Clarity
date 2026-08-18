@@ -109,7 +109,7 @@ when you use it:
 
 | Feature | Host | What leaves your machine |
 | --- | --- | --- |
-| Vulnerability scan | `services.nvd.nist.gov` | The vendor and product name of each recognised installed app, as a CPE string (`cpe:2.3:a:google:chrome`). Not the version — installed versions are compared against the results locally. |
+| Vulnerability scan | `services.nvd.nist.gov` | Two requests per app. **A CPE identifier** (`cpe:2.3:a:google:chrome`) to fetch that product's CVEs, and — for apps not in the bundled alias table — **the app's display name as typed on disk**, to look its identifier up in NVD's CPE dictionary. So an unusually or privately named application is sent verbatim. Versions never leave the machine; they are compared against the results locally. Names that are not applications (bundle identifiers, Automator templates, updater stubs) are filtered out before any request, and every lookup result is cached so a name is sent at most once per 30 days. |
 | Exploited-CVE feed | `cisa.gov` | Nothing. A public JSON catalogue is downloaded and cached. |
 | Public IP | `api.ipify.org`, `ipv4.icanhazip.com` | Nothing beyond the request, which by its nature shows your IP address to that host. This is the only way to learn your public IP. |
 | Update check | `api.github.com` | Nothing beyond the request. |
