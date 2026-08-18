@@ -9,6 +9,13 @@ test-results/
 # binary that is wrong for anyone else's Electron version.
 src/native/*/build/
 *.log
+# Local environment overrides. Nothing in this app loads a .env file (there is no
+# dotenv dependency) and no secret is read from the environment, so these are
+# ignored defensively: the moment someone adds a loader, an untracked .env should
+# already be the default rather than a thing to remember.
+.env
+.env.*
+!.env.example
 .DS_Store
 Thumbs.db
 .claude/
