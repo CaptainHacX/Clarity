@@ -25,10 +25,18 @@ import { attachRendererDiagnostics } from './services/renderer-diagnostics'
 import { shouldDisableGpu, applyGpuFallbackSwitches, registerGpuCrashRecovery } from './services/gpu-fallback'
 import { runCli } from './cli'
 import { installCrashGuard } from './services/crash-guard'
+import { hardenExecutablePath } from './services/path-hardening'
 
 // ─── Crash guard ────────────────────────────────────────────
 // Install before anything else so an early failure in this file is captured.
 installCrashGuard()
+
+// ─── Executable search path ─────────────────────────────────
+// Before anything spawns a child process. This app runs elevated and launches
+// ~90 system tools by bare name; `powershell.exe` in particular is resolved by
+// walking PATH, so a user-writable directory ahead of the real one would be an
+// administrator-level code execution primitive.
+hardenExecutablePath()
 
 // ─── Disable hardware acceleration ──────────────────────────
 // Must be called before app.whenReady().  On machines with incompatible
