@@ -130,7 +130,7 @@
   },
   "coverage": {
     "heading": "Coverage",
-    "hint": "These applications have no NVD CPE mapping, so they were never checked. They are unknown, not confirmed clean.",
+    "hint": "These applications were not checked, so they are unknown rather than confirmed clean. Most have no matching entry in NVD; some were skipped because no version could be read, or because a lookup did not complete.",
     "entries": "{{total}} of {{library}} entries",
     "pct": "{{pct}}%",
     "title": "Scan coverage",

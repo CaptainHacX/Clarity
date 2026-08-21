@@ -572,7 +572,9 @@ Config Management:
 
 Prometheus Metrics:
   metrics                    Print current metrics (Prometheus text format)
-  metrics-server [--port N]  Start HTTP metrics endpoint (default: port 9100)
+  metrics-server [--port N] [--host H]  Start HTTP metrics endpoint
+                             (default: 127.0.0.1:9100 — loopback only;
+                              pass --host 0.0.0.0 to allow remote scraping)
 
 Global Options:
   --json          Output as JSON
@@ -1243,12 +1245,32 @@ async function handleMetrics(args: string[], ctx: CliContext): Promise<number | 
   }
 }
 
+/**
+ * Where the Prometheus exporter should listen.
+ *
+ * Loopback unless a host is asked for explicitly. It used to bind every
+ * interface, so starting the exporter silently published this machine's uptime,
+ * RAM, CPU and cleaner activity to the whole network — unauthenticated, with
+ * nothing in the output hinting it was reachable off-box. Cross-host scraping is
+ * a legitimate need so it stays possible, but it now has to be stated.
+ */
+export function parseMetricsServerArgs(args: string[]): { host: string; port: number } {
+  const portIdx = args.indexOf('--port')
+  const rawPort = portIdx !== -1 ? Number.parseInt(args[portIdx + 1] ?? '', 10) : NaN
+  const port = Number.isInteger(rawPort) && rawPort > 0 && rawPort <= 65535 ? rawPort : 9100
+
+  const hostIdx = args.indexOf('--host')
+  const rawHost = hostIdx !== -1 ? (args[hostIdx + 1] ?? '').trim() : ''
+  const host = rawHost !== '' && !rawHost.startsWith('--') ? rawHost : '127.0.0.1'
+
+  return { host, port }
+}
+
 async function handleMetricsServer(args: string[], ctx: CliContext): Promise<void> {
   const http = await import('http')
   const { collectMetrics, formatPrometheus } = await import('./services/metrics')
 
-  const portIdx = args.indexOf('--port')
-  const port = portIdx !== -1 ? (parseInt(args[portIdx + 1]) || 9100) : 9100
+  const { host, port } = parseMetricsServerArgs(args)
 
   const server = http.createServer(async (req, res) => {
     if (req.url === '/metrics') {
@@ -1257,8 +1279,12 @@ async function handleMetricsServer(args: string[], ctx: CliContext): Promise<voi
         res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' })
         res.end(formatPrometheus(metrics))
       } catch (err: any) {
+        // Detail goes to the operator's console, not to the caller: this
+        // endpoint is unauthenticated and err.message can carry a filesystem
+        // path or other internal state.
+        cliLog(ctx, `Error collecting metrics: ${err?.message ?? err}`)
         res.writeHead(500, { 'Content-Type': 'text/plain' })
-        res.end(`Error collecting metrics: ${err.message}\n`)
+        res.end('Error collecting metrics\n')
       }
     } else if (req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -1280,8 +1306,13 @@ async function handleMetricsServer(args: string[], ctx: CliContext): Promise<voi
         reject(err)
       }
     })
-    server.listen(port, () => {
-      cliLog(ctx, `Prometheus metrics server listening on http://0.0.0.0:${port}/metrics`)
+    server.listen(port, host, () => {
+      cliLog(ctx, `Prometheus metrics server listening on http://${host}:${port}/metrics`)
+      if (host === '127.0.0.1') {
+        cliLog(ctx, 'Bound to loopback only. Pass --host 0.0.0.0 to allow scraping from other machines.')
+      } else {
+        cliLog(ctx, `::warning:: Reachable from the network on ${host} with no authentication.`)
+      }
       cliLog(ctx, 'Press Ctrl+C to stop.')
       resolve()
     })

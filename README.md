@@ -184,7 +184,8 @@ Clarity works fully headless for scripting, IT administration, and scheduled tas
 clarity --cli --all --clean --json    # scan + clean everything, machine-readable output
 clarity --cli --system --browser      # scan specific categories only (dry run)
 clarity --cli metrics                 # export Prometheus metrics
-clarity --cli metrics-server          # serve metrics over HTTP (default :9100)
+clarity --cli metrics-server          # serve metrics over HTTP (loopback, :9100)
+clarity --cli metrics-server --host 0.0.0.0   # allow scraping from other machines
 ```
 
 See [CLI.md](CLI.md) for the full reference — categories, options, JSON output schema, Prometheus metrics, and exit codes.
