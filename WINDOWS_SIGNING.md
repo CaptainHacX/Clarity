@@ -64,6 +64,24 @@ create in the SignPath dashboard):
 2. Grant it access to the repository. This lets SignPath verify the build really came from
    your GitHub Actions workflow (origin verification) and download the artifact to sign.
 
+## Step 2b — Add the GitHub trusted build system and link it to the project
+
+**Do not skip this.** Installing the GitHub App is not sufficient on its own, and
+omitting this step is the single most likely reason a correctly-configured token still
+fails. The connector refuses submissions from an organisation that has no trusted build
+system for GitHub, and the error it returns does not say so.
+
+In the SignPath dashboard (`app.signpath.io`):
+
+1. Open your organisation → **Trusted Build Systems**.
+2. Add the predefined **GitHub.com** build system to the organisation.
+3. Open the Clarity project → link the **GitHub.com** trusted build system to it.
+
+Both actions are required: adding it to the organisation alone leaves the project
+unlinked, and the submission is still rejected.
+
+Reference: https://docs.signpath.io/trusted-build-systems/github
+
 ## Step 3 — Create a project, artifact configuration, and signing policy
 
 In the SignPath dashboard (`app.signpath.io`):
@@ -143,6 +161,40 @@ macOS and Linux builds are unaffected.
 **Job fails at "Verify SignPath Foundation configuration"**
 One of the 5 required settings is missing. Check that `SIGNPATH_API_TOKEN` is a **secret**
 and the four slugs are **variables** (not secrets), and the names match exactly.
+
+**"Could not authorize against SignPath API" — read the lines above it first**
+
+This message is the action's catch-all: it is printed for a rejected token *and* for a
+server error, so on its own it says almost nothing. Scroll up in the step log. If you see
+
+```
+SignPath REST API is temporarily unavailable (server responded with 503).
+```
+
+then the connector returned **HTTP 503** and the token is very likely fine. In order of
+likelihood:
+
+1. **The GitHub.com trusted build system is not added to the organisation, or not linked
+   to the project** — see Step 2b. This is the usual cause when signing has *never* worked.
+2. The API token's user is not a **Submitter** on the signing policy.
+3. One of the slugs (`SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`,
+   `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`) does not exist under that organisation id.
+4. SignPath is genuinely degraded — check https://about.signpath.io/status.
+
+The release workflow runs a **Preflight SignPath connector** step before building, which
+prints the connector's raw HTTP status. Read that first; it distinguishes "service
+unavailable" from "credentials rejected" in one line, without waiting for a 20-minute
+build.
+
+Note that the known integer-overflow bug with large GitHub artifact IDs (GitHub's global
+IDs crossed max-int in Nov 2024) was fixed **server-side** in GitHub Connector 1.0.1 and
+1.1.0. It is not a cause of current failures and needs no action version change.
+
+**Blocked on signing and need to ship?** Set the repository variable
+`ALLOW_UNSIGNED_WINDOWS` to `true`. The release then publishes an **unsigned** installer
+plus valid `latest.yml`, with a warning in the job log — SmartScreen will warn users on
+install. Unset it as soon as signing works. Leaving it set silently ships unsigned builds
+forever, which defeats the point of this document.
 
 **Signing request is rejected / origin verification fails**
 - The **SignPath GitHub App** must be installed (Step 2) and the workflow must run on

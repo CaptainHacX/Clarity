@@ -133,4 +133,9 @@ compression: maximum
 
 publish:
   provider: github
-  releaseType: release
+  # Draft, matching the release the workflow pre-creates. The workflow publishes
+  # it only after every platform has uploaded successfully, so users never see a
+  # release that is missing an installer. Do not set this back to `release`: that
+  # makes each platform publish independently, which is how a failed Windows job
+  # produced a public release with no Windows build in it.
+  releaseType: draft

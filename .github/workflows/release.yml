@@ -48,7 +48,16 @@ jobs:
               fs.writeFileSync('_RELEASE_NOTES.md', '');
             }
           "
-          gh release create "$TAG_NAME" --title "$TAG_NAME" --notes-file _RELEASE_NOTES.md
+          # Created as a DRAFT deliberately. The platform builds below upload into
+          # it, and finalize-release publishes it only once every platform has
+          # succeeded. Publishing up front is what let v1.0.3 and v1.1.0 go out
+          # with no Windows installer at all: the release was already public
+          # before the Windows job failed, so a partial release looked like a
+          # finished one.
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
+            --notes-file _RELEASE_NOTES.md \
+            --draft
 
   build:
     needs: create-release
@@ -134,11 +143,39 @@ jobs:
           SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          ALLOW_UNSIGNED_WINDOWS: ${{ vars.ALLOW_UNSIGNED_WINDOWS }}
         run: |
           if [ -z "$SIGNPATH_API_TOKEN" ] || [ -z "$SIGNPATH_ORGANIZATION_ID" ] || [ -z "$SIGNPATH_PROJECT_SLUG" ] || [ -z "$SIGNPATH_SIGNING_POLICY_SLUG" ] || [ -z "$SIGNPATH_ARTIFACT_CONFIGURATION_SLUG" ]; then
+            if [ "${ALLOW_UNSIGNED_WINDOWS}" = "true" ]; then
+              echo "::warning::SignPath is not configured and ALLOW_UNSIGNED_WINDOWS is set — this release will ship an UNSIGNED Windows installer. SmartScreen will warn users on install."
+              exit 0
+            fi
             echo "::error::SignPath Foundation signing not configured (SIGNPATH_API_TOKEN / SIGNPATH_ORGANIZATION_ID / SIGNPATH_PROJECT_SLUG / SIGNPATH_SIGNING_POLICY_SLUG / SIGNPATH_ARTIFACT_CONFIGURATION_SLUG). Refusing to release an unsigned installer — SmartScreen would flag it. See WINDOWS_SIGNING.md."
             exit 1
           fi
+
+      # Reachability preflight, before the ~20 minute build rather than after it.
+      #
+      # The signing action reports every failure as "Could not authorize against
+      # SignPath API", including a plain 503 from the connector. That one line
+      # sent an investigation towards expired tokens when the real answer was a
+      # server response, so probe the connector here and print the status code
+      # verbatim. No credentials are sent: an unauthenticated request is enough
+      # to tell "service answering" from "service unavailable".
+      - name: Preflight SignPath connector
+        if: runner.os == 'Windows'
+        shell: bash
+        continue-on-error: true
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 \
+            https://githubactions.connectors.signpath.io/ || echo "000")
+          echo "SignPath GitHub Actions connector responded: HTTP ${code}"
+          case "$code" in
+            000) echo "::warning::Connector unreachable from this runner (DNS/network/timeout)." ;;
+            401|403) echo "Connector is up and rejecting unauthenticated probes — expected, credentials are checked at submit time." ;;
+            503) echo "::warning::Connector returned 503 Service Unavailable. Signing will fail. Either SignPath is degraded (check https://about.signpath.io/status) or the GitHub.com trusted build system is not added to the organisation and linked to project '${{ vars.SIGNPATH_PROJECT_SLUG }}'. See docs.signpath.io/trusted-build-systems/github." ;;
+            *) echo "Connector reachable (HTTP ${code})." ;;
+          esac
 
       - name: Build, package, and upload (macOS / Linux)
         if: runner.os != 'Windows'
@@ -176,8 +213,14 @@ jobs:
           archive: false
           if-no-files-found: error
 
+      # `id` so the publish step below can tell whether a signed binary exists.
+      # continue-on-error only when the unsigned escape hatch is deliberately
+      # enabled; with signing required (the default) a failure here still fails
+      # the job, the draft is never published, and no partial release goes out.
       - name: Submit signing request to SignPath Foundation
+        id: signpath
         if: runner.os == 'Windows'
+        continue-on-error: ${{ vars.ALLOW_UNSIGNED_WINDOWS == 'true' }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -190,30 +233,48 @@ jobs:
           output-artifact-directory: signed-installer
           skip-decompress: true
 
-      - name: Publish signed installer to release
+      - name: Publish Windows installer to release
         if: runner.os == 'Windows'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+          SIGNING_OUTCOME: ${{ steps.signpath.outcome }}
+          ALLOW_UNSIGNED_WINDOWS: ${{ vars.ALLOW_UNSIGNED_WINDOWS }}
         timeout-minutes: 10
         run: |
           set -euo pipefail
           exe="Clarity-Setup-${VERSION}.exe"
-          # SignPath may name the signed file per its artifact configuration, so fall
-          # back to any .exe it returned and normalize it to the canonical name.
+
+          # Pick the binary to ship. Signed when SignPath returned one; otherwise
+          # the unsigned build, but only when that was an explicit choice.
           if [ -f "signed-installer/${exe}" ]; then
             signed="signed-installer/${exe}"
           elif [ -n "$(ls signed-installer/*.exe 2>/dev/null || true)" ]; then
+            # SignPath names the output per its artifact configuration, so accept
+            # any .exe it returned and normalise it to the canonical name.
             signed="$(ls signed-installer/*.exe 2>/dev/null | head -n1)"
             echo "Using signed file name '$signed' (artifact configuration returned a different name than $exe)."
+          elif [ "${ALLOW_UNSIGNED_WINDOWS}" = "true" ]; then
+            echo "::warning::Signing did not produce a binary (outcome: ${SIGNING_OUTCOME}). Publishing the UNSIGNED installer because ALLOW_UNSIGNED_WINDOWS is set. SmartScreen will warn users on install."
+            signed=""
           else
             echo "::error::SignPath did not return a signed ${exe} in signed-installer/ — files found: $(ls signed-installer/ 2>/dev/null || echo none)"
             exit 1
           fi
-          cp "$signed" "dist-prod/${exe}"
-          # Signing rewrites the binary, so the sha512 electron-builder recorded in
-          # latest.yml for the unsigned build is stale. Regenerate it for the signed file.
+          [ -n "$signed" ] && cp "$signed" "dist-prod/${exe}"
+
+          if [ ! -f "dist-prod/${exe}" ]; then
+            echo "::error::No installer at dist-prod/${exe} to publish."
+            exit 1
+          fi
+
+          # latest.yml is generated here, for whichever binary is actually being
+          # published, and no longer only on the signing-success path. It is what
+          # drives Windows auto-update, and tying it to signing meant a signing
+          # failure silently disabled updates for every existing Windows user —
+          # which is exactly the state v1.1.0 shipped in. Signing also rewrites
+          # the binary, so electron-builder's own sha512 is stale either way.
           node -e "
             const fs = require('fs');
             const crypto = require('crypto');
@@ -236,8 +297,61 @@ jobs:
           "
           gh release upload "$GITHUB_REF_NAME" "dist-prod/${exe}" "dist-prod/latest.yml" --clobber
 
-  publish-choco:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # The release is published here and nowhere else.
+  #
+  # Every platform uploads into a draft; this job flips it to public only after
+  # all three legs have succeeded, and asserts the expected assets are actually
+  # attached before doing so. Previously the release was created public up front,
+  # so a failed Windows job produced a finished-looking release with no Windows
+  # installer — that is how v1.0.3 and v1.1.0 both shipped without one, unnoticed
+  # for two releases. A failure now leaves an unpublished draft instead, which is
+  # invisible to users and trivially resumable by re-running the failed job.
+  # ─────────────────────────────────────────────────────────────────────────────
+  finalize-release:
     needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every platform shipped, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${TAG_NAME#v}"
+
+          assets=$(gh release view "$TAG_NAME" --repo "$REPO" --json assets --jq '.assets[].name')
+          echo "Attached assets:"; echo "$assets" | sed 's/^/  /'
+
+          # One representative artifact per platform, plus the update metadata
+          # each platform's updater reads. Missing metadata is as bad as a missing
+          # installer: it silently strands existing users on the old version.
+          missing=""
+          for required in \
+            "Clarity-Setup-${version}.exe" \
+            "latest.yml" \
+            "Clarity-${version}-prod-x64.dmg" \
+            "Clarity-${version}-prod-arm64.dmg" \
+            "latest-mac.yml" \
+            "Clarity-${version}-prod-x86_64.AppImage" \
+            "Clarity-${version}-prod-amd64.deb" \
+            "latest-linux.yml"
+          do
+            echo "$assets" | grep -qxF "$required" || missing="${missing}\n  - ${required}"
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::Refusing to publish ${TAG_NAME} — the draft is missing:$(printf "$missing")"
+            echo "The draft release has been left unpublished. Fix the failing platform, re-run it, then re-run this job."
+            exit 1
+          fi
+
+          gh release edit "$TAG_NAME" --repo "$REPO" --draft=false
+          echo "Published ${TAG_NAME} with all platforms present."
+
+  publish-choco:
+    needs: finalize-release
     if: ${{ vars.PUBLISH_CHOCO == 'true' }}
     runs-on: windows-latest
 
@@ -282,7 +396,7 @@ jobs:
           choco push clarity.${{ steps.version.outputs.version }}.nupkg --source "https://push.chocolatey.org/" --api-key "${{ secrets.CHOCOLATEY_API_KEY }}"
 
   virustotal-scan:
-    needs: build
+    needs: finalize-release
     if: ${{ vars.PUBLISH_VIRUSTOTAL == 'true' }}
     runs-on: ubuntu-latest
 
@@ -350,7 +464,7 @@ jobs:
           ${vt_report}"
 
   publish-winget:
-    needs: build
+    needs: finalize-release
     if: ${{ vars.PUBLISH_WINGET == 'true' }}
     runs-on: windows-latest
     env:
