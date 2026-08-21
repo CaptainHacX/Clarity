@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
+import { useEffect, useCallback, useMemo, useRef, useState, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -57,6 +57,19 @@ import {
 import type { CveVulnerability, CveSeverity, CveStatus, CveSummary } from '@shared/types'
 import type { LucideIcon } from 'lucide-react'
 
+// Memoized so a keystroke in the search box — which lives in this page's own
+// useState — stops reconciling the Recharts donut, the score ring and every
+// stat card. Their props are stable primitives, so memo actually bites here.
+// Declarations are hoisted, hence the bindings can sit above them.
+const ScoreRing = memo(ScoreRingBase)
+const SectionHeading = memo(SectionHeadingBase)
+const StatCard = memo(StatCardBase)
+const SeverityDonut = memo(SeverityDonutBase)
+const MetaTile = memo(MetaTileBase)
+const QuickActionCard = memo(QuickActionCardBase)
+const ScanInfo = memo(ScanInfoBase)
+
+
 const EASE = [0.16, 1, 0.3, 1] as const
 
 // `color` is a theme variable, not a literal: these hues are rendered as text,
@@ -106,7 +119,7 @@ function computeScore(summary: CveSummary): number {
 
 // ── Score ring ────────────────────────────────────────────────
 
-function ScoreRing({ score }: { score: number }) {
+function ScoreRingBase({ score }: { score: number }) {
   const animatedScore = useAnimatedCounter(score, 1000)
   const colors =
     score >= 70
@@ -185,7 +198,7 @@ function Section({ children }: { children: React.ReactNode; index?: number }) {
   return <section>{children}</section>
 }
 
-function SectionHeading({ icon: Icon, title, hint }: { icon: LucideIcon; title: string; hint?: string }) {
+function SectionHeadingBase({ icon: Icon, title, hint }: { icon: LucideIcon; title: string; hint?: string }) {
   return (
     <div className="mb-3">
       <div className="flex items-center gap-2">
@@ -208,7 +221,7 @@ function SectionHeading({ icon: Icon, title, hint }: { icon: LucideIcon; title: 
 
 // ── Stat card ─────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, color, bg, hint }: {
+function StatCardBase({ icon: Icon, label, value, color, bg, hint }: {
   icon: LucideIcon
   label: string
   value: number
@@ -267,7 +280,7 @@ function FilterSelect({ value, options, onChange }: {
 
 // ── Severity donut ────────────────────────────────────────────
 
-function SeverityDonut({ data }: { data: { key: CveSeverity; count: number }[] }) {
+function SeverityDonutBase({ data }: { data: { key: CveSeverity; count: number }[] }) {
   const { t } = useTranslation('cveScanner')
   const visible = data.filter((d) => d.count > 0)
   const total = data.reduce((sum, d) => sum + d.count, 0)
@@ -405,7 +418,10 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
     >
       <div
         className="absolute inset-0"
-        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}
+        // A blur this wide is recomposited every frame of the open/close fade,
+        // across the whole viewport, which is what made the drawer feel heavy.
+        // 3px reads almost identically over a 55% black scrim and costs far less.
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -570,7 +586,7 @@ function VulnSlideOver({ vuln, onClose }: { vuln: CveVulnerability; onClose: () 
   )
 }
 
-function MetaTile({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
+function MetaTileBase({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
     <div className="rounded-xl px-4 py-3" style={{ background: 'var(--bg-subtle)' }}>
       <p className="text-[10.5px] font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
@@ -1431,7 +1447,7 @@ export function CveScannerPage() {
   )
 }
 
-function QuickActionCard({ icon: Icon, title, description, gradient, glow, disabled, onClick }: {
+function QuickActionCardBase({ icon: Icon, title, description, gradient, glow, disabled, onClick }: {
   icon: LucideIcon
   title: string
   description: string
@@ -1465,7 +1481,7 @@ function QuickActionCard({ icon: Icon, title, description, gradient, glow, disab
   )
 }
 
-function ScanInfo({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+function ScanInfoBase({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="rounded-xl px-3.5 py-3" style={{ background: 'var(--bg-subtle)' }}>
       <div className="flex items-center gap-2">
